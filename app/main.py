@@ -1,7 +1,7 @@
 import os
 import sys
 
-# 将项目根目录添加到Python路径
+# Add project root directory to Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from fastapi import FastAPI, HTTPException, Request
@@ -18,7 +18,7 @@ from sqlalchemy import text
 from app.core.middleware import setup_middleware
 import logging
 
-# 配置日志记录
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
@@ -29,70 +29,70 @@ logging.basicConfig(
 )
 logger = logging.getLogger("app")
 
-# 加载环境变量
+# Load environment variables
 load_dotenv()
 
-# 初始化数据库
+# Initialize database
 try:
     init_db()
-    logger.info("数据库初始化成功")
+    logger.info("Database initialization successful")
 except Exception as e:
-    logger.error(f"初始化数据库时出错: {e}")
+    logger.error(f"Error initializing database: {e}")
 
-# 创建FastAPI应用
+# Create FastAPI application
 app = FastAPI(
-    title="Gemini 向量搜索API",
+    title="Gemini Vector Search API",
     description="""
-    # Gemini 向量搜索API
+    # Gemini Vector Search API
 
-    基于Google Gemini 2.0 Flash模型的API系统，提供以下功能：
+    API system based on Google Gemini 2.0 Flash model, providing the following features:
     
-    ## 主要功能
+    ## Main Features
     
-    * **向量检索**：将文档转换为向量并进行相似度搜索
-    * **文档管理**：上传、检索和管理文档
-    * **智能问答**：基于文档内容回答问题
+    * **Vector Retrieval**: Convert documents to vectors and perform similarity searches
+    * **Document Management**: Upload, retrieve, and manage documents
+    * **Smart Q&A**: Answer questions based on document content
     """,
     version="1.0.0",
-    docs_url=None,  # 禁用默认的docs路径，我们将创建自定义的
+    docs_url=None,  # Disable default docs path, we'll create a custom one
     redoc_url="/redoc",
     openapi_url="/api/openapi.json"
 )
 
-# 设置中间件
+# Set up middleware
 setup_middleware(app)
 
-# 包含API路由
+# Include API routes
 app.include_router(router, tags=["API"])
 
-# 包含健康检查路由
-app.include_router(health_router, tags=["系统"])
+# Include health check routes
+app.include_router(health_router, tags=["System"])
 
-# 全局异常处理
+# Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """处理所有未处理的异常"""
-    logger.error(f"全局异常: {str(exc)}", exc_info=True)
+    """Handle all unhandled exceptions"""
+    logger.error(f"Global exception: {str(exc)}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": f"服务器内部错误: {str(exc)}"}
+        content={"detail": f"Internal server error: {str(exc)}"}
     )
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    """处理HTTP异常"""
-    logger.warning(f"HTTP异常: {exc.status_code} - {exc.detail}")
+    """Handle HTTP exceptions"""
+    logger.warning(f"HTTP exception: {exc.status_code} - {exc.detail}")
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail}
     )
 
-# 自定义的OpenAPI文档路径，增强Swagger UI体验
+# Custom OpenAPI documentation path, enhancing Swagger UI experience
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html():
     return get_swagger_ui_html(
         openapi_url="/api/openapi.json",
-        title="Gemini向量搜索API - 交互式文档",
+        title="Gemini Vector Search API - Interactive Documentation",
         swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
         swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
         swagger_favicon_url="/static/favicon.png",
@@ -100,79 +100,79 @@ async def custom_swagger_ui_html():
         init_oauth=None,
     )
 
-# 自定义OpenAPI信息
+# Custom OpenAPI information
 @app.get("/api/openapi.json", include_in_schema=False)
 async def get_open_api_endpoint():
     openapi_schema = get_openapi(
-        title="Gemini向量搜索API",
+        title="Gemini Vector Search API",
         version="1.0.0",
         description="""
-        # Gemini向量搜索API文档
+        # Gemini Vector Search API Documentation
         
-        这是一个基于Google Gemini 2.0 Flash模型的API系统，提供文档管理、向量检索和AI生成功能。
+        This is an API system based on Google Gemini 2.0 Flash model, providing document management, vector retrieval, and AI generation capabilities.
         
-        ## 访问说明
+        ## Access Information
         
-        所有API端点均可自由访问，无需认证。
+        All API endpoints are freely accessible without authentication.
         
-        ## 主要功能
+        ## Main Features
         
-        * 文档管理：上传PDF、添加文档、获取文档列表
-        * 向量检索：生成嵌入向量、搜索相似文档
-        * 文本生成：基于Gemini模型生成补全文本
-        * 集成功能：结合向量检索与文本生成的一体化查询
+        * Document Management: Upload PDFs, add documents, get document listings
+        * Vector Retrieval: Generate embedding vectors, search similar documents
+        * Text Generation: Generate completion text based on Gemini model
+        * Integrated Functions: Combined vector retrieval and text generation in a unified query
         
-        详细使用说明请参考项目文档。
+        Please refer to the project documentation for detailed usage instructions.
         """,
         routes=app.routes,
     )
     
-    # 修改标签顺序和描述
+    # Modify tag order and descriptions
     openapi_schema["tags"] = [
         {
-            "name": "系统",
-            "description": "系统健康检查和状态相关端点"
+            "name": "System",
+            "description": "System health check and status related endpoints"
         },
         {
             "name": "API",
-            "description": "核心功能API端点"
+            "description": "Core functionality API endpoints"
         }
     ]
     
     return openapi_schema
 
-# 主页
+# Home page
 @app.get("/")
 async def root():
     """
-    返回API主页信息，包含文档链接
+    Return API home page information, including documentation links
     """
     return {
-        "message": "欢迎使用Gemini向量搜索API",
+        "message": "Welcome to the Gemini Vector Search API",
         "swagger_docs": "/docs",
         "redoc": "/redoc",
         "api_guide": "/api-guide"
     }
 
-# 健康检查端点
+# Health check endpoint
 @app.get("/health", tags=["health"])
 def health_check():
     """
-    健康检查端点，用于监控系统是否正常运行
+    Health check endpoint for monitoring system operational status
     
-    返回:
-        dict: 包含状态信息的字典
+    Returns:
+        dict: Dictionary containing status information
     """
     return {"status": "healthy"}
 
-# pgvector状态检查端点
+# pgvector status check endpoint
 @app.get("/vector-status", tags=["health"])
 async def vector_status():
     """
-    检查pgvector扩展是否正确安装
+    Check if the pgvector extension is correctly installed
     
-    返回:
-        dict: 包含pgvector安装状态的字典
+    Returns:
+        dict: Dictionary containing pgvector installation status
     """
     try:
         with engine.connect() as conn:
@@ -180,41 +180,41 @@ async def vector_status():
             has_vector = result.scalar() is not None
             return {"pgvector_installed": has_vector}
     except Exception as e:
-        logger.error(f"检查pgvector状态时出错: {e}")
+        logger.error(f"Error checking pgvector status: {e}")
         return {"pgvector_installed": False, "error": str(e)}
 
-# 提供API指南的静态文件
+# Provide static files for API guide
 try:
     app.mount("/api-guide", StaticFiles(directory="static", html=True), name="api_guide")
 except Exception as e:
-    logger.error(f"无法挂载静态文件目录: {e}")
-    # 创建一个临时路由作为替代
+    logger.error(f"Unable to mount static files directory: {e}")
+    # Create a temporary route as an alternative
     @app.get("/api-guide")
     async def api_guide_redirect():
-        """重定向到API文档"""
-        return {"message": "API使用指南暂不可用，请查看Swagger文档", "docs_url": "/docs"}
+        """Redirect to API documentation"""
+        return {"message": "API usage guide is currently unavailable, please check the Swagger documentation", "docs_url": "/docs"}
 
-# 添加文档浏览器页面路由
-# 该功能已移除
+# Add document browser page route
+# This feature has been removed
 
-# 启动事件
+# Startup event
 @app.on_event("startup")
 async def startup_event():
-    """应用启动时执行的代码"""
-    logger.info("应用启动")
+    """Code executed at application startup"""
+    logger.info("Application started")
 
-# 关闭事件
+# Shutdown event
 @app.on_event("shutdown")
 async def shutdown_event():
-    """应用关闭时执行的代码"""
-    logger.info("应用关闭")
+    """Code executed at application shutdown"""
+    logger.info("Application shutdown")
 
-# 如果直接运行此文件
+# If this file is run directly
 if __name__ == "__main__":
     import uvicorn
     
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
     
-    logger.info(f"以开发模式启动应用: http://{host}:{port}")
+    logger.info(f"Starting application in development mode: http://{host}:{port}")
     uvicorn.run("app.main:app", host=host, port=port, reload=True) 

@@ -1,33 +1,33 @@
 """
-缓存服务 - 用于缓存向量和查询结果，提高性能
+Cache Service - For caching vectors and query results to improve performance
 """
 import time
 import logging
 from functools import wraps
 from typing import Dict, Any, Callable, Optional, List, Tuple
 
-# 配置日志
+# Configure logging
 logger = logging.getLogger("cache_service")
 
-# 内存缓存，结构 {key: {"value": value, "expires_at": timestamp}}
+# Memory cache, structure {key: {"value": value, "expires_at": timestamp}}
 _cache: Dict[str, Dict[str, Any]] = {}
 
 def get_cache(key: str) -> Optional[Any]:
     """
-    从缓存获取值
+    Get value from cache
     
-    参数:
-        key: 缓存键
+    Parameters:
+        key: Cache key
         
-    返回:
-        缓存的值，如果不存在或已过期则返回None
+    Returns:
+        Cached value, or None if not exists or expired
     """
     if key not in _cache:
         return None
         
     cache_item = _cache[key]
     
-    # 检查是否过期
+    # Check if expired
     if "expires_at" in cache_item and time.time() > cache_item["expires_at"]:
         del _cache[key]
         return None
@@ -36,12 +36,12 @@ def get_cache(key: str) -> Optional[Any]:
 
 def set_cache(key: str, value: Any, ttl: int = 3600) -> None:
     """
-    设置缓存
+    Set cache
     
-    参数:
-        key: 缓存键
-        value: 要缓存的值
-        ttl: 缓存有效期（秒），默认3600秒（1小时）
+    Parameters:
+        key: Cache key
+        value: Value to cache
+        ttl: Cache time-to-live (seconds), default 3600 seconds (1 hour)
     """
     expires_at = time.time() + ttl if ttl > 0 else None
     
@@ -52,13 +52,13 @@ def set_cache(key: str, value: Any, ttl: int = 3600) -> None:
 
 def delete_cache(key: str) -> bool:
     """
-    删除缓存
+    Delete cache
     
-    参数:
-        key: 缓存键
+    Parameters:
+        key: Cache key
         
-    返回:
-        是否成功删除
+    Returns:
+        Whether successfully deleted
     """
     if key in _cache:
         del _cache[key]
@@ -67,16 +67,16 @@ def delete_cache(key: str) -> bool:
 
 def clear_cache() -> None:
     """
-    清空所有缓存
+    Clear all cache
     """
     _cache.clear()
 
 def clean_expired_cache() -> int:
     """
-    清理所有过期的缓存项
+    Clean all expired cache items
     
-    返回:
-        清理的缓存项数量
+    Returns:
+        Number of cache items cleaned
     """
     now = time.time()
     expired_keys = [
@@ -91,46 +91,46 @@ def clean_expired_cache() -> int:
 
 def cached(ttl: int = 3600):
     """
-    函数缓存装饰器
+    Function cache decorator
     
-    参数:
-        ttl: 缓存有效期（秒），默认3600秒（1小时）
+    Parameters:
+        ttl: Cache time-to-live (seconds), default 3600 seconds (1 hour)
     """
     def decorator(func: Callable):
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
-            # 生成缓存键
+            # Generate cache key
             cache_key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
             
-            # 尝试从缓存获取
+            # Try to get from cache
             cached_result = get_cache(cache_key)
             if cached_result is not None:
-                logger.debug(f"缓存命中: {cache_key}")
+                logger.debug(f"Cache hit: {cache_key}")
                 return cached_result
                 
-            # 执行函数
+            # Execute function
             result = await func(*args, **kwargs)
             
-            # 设置缓存
+            # Set cache
             set_cache(cache_key, result, ttl)
             
             return result
             
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
-            # 生成缓存键
+            # Generate cache key
             cache_key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
             
-            # 尝试从缓存获取
+            # Try to get from cache
             cached_result = get_cache(cache_key)
             if cached_result is not None:
-                logger.debug(f"缓存命中: {cache_key}")
+                logger.debug(f"Cache hit: {cache_key}")
                 return cached_result
                 
-            # 执行函数
+            # Execute function
             result = func(*args, **kwargs)
             
-            # 设置缓存
+            # Set cache
             set_cache(cache_key, result, ttl)
             
             return result
@@ -139,13 +139,13 @@ def cached(ttl: int = 3600):
         
     return decorator
 
-# 缓存统计
+# Cache statistics
 def get_cache_stats() -> Dict[str, Any]:
     """
-    获取缓存统计信息
+    Get cache statistics
     
-    返回:
-        包含统计信息的字典
+    Returns:
+        Dictionary containing statistics
     """
     now = time.time()
     total_items = len(_cache)
@@ -160,10 +160,10 @@ def get_cache_stats() -> Dict[str, Any]:
         "expired_items": expired_items
     }
 
-# 启动周期性任务清理过期缓存
+# Start periodic task to clean expired cache
 def start_cleanup_task():
     """
-    启动周期性任务，清理过期缓存项
+    Start periodic task to clean expired cache items
     """
     import threading
     
@@ -172,14 +172,14 @@ def start_cleanup_task():
             try:
                 cleaned = clean_expired_cache()
                 if cleaned > 0:
-                    logger.info(f"缓存清理：已删除 {cleaned} 个过期项")
+                    logger.info(f"Cache cleanup: Deleted {cleaned} expired items")
             except Exception as e:
-                logger.error(f"缓存清理出错: {e}")
+                logger.error(f"Cache cleanup error: {e}")
                 
-            # 每小时执行一次
+            # Execute once every hour
             time.sleep(3600)
     
-    # 创建守护线程执行清理
+    # Create daemon thread for cleanup
     cleanup_thread = threading.Thread(target=cleanup_task, daemon=True)
     cleanup_thread.start()
-    logger.info("缓存清理任务已启动") 
+    logger.info("Cache cleanup task started") 

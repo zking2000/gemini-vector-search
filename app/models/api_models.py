@@ -2,73 +2,73 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
 class DocumentBase(BaseModel):
-    """文档基础模型"""
+    """Document Base Model"""
     content: str
     metadata: Optional[Dict[str, Any]] = None
 
 class DocumentCreate(BaseModel):
     """
-    创建文档的请求模型
+    Document Creation Request Model
     """
-    content: str = Field(..., description="文档的文本内容，这将被转换为嵌入向量", 
-                        example="向量数据库是一种专门用于存储和检索向量的数据库系统。它允许用户通过相似度搜索找到语义上相似的内容。")
-    metadata: Optional[Dict[str, Any]] = Field({}, description="文档的元数据，可以包含任意键值对",
-                                              example={"source": "技术文档.pdf", "author": "张三", "date": "2024-05-01"})
+    content: str = Field(..., description="Text content of the document, which will be converted to an embedding vector", 
+                        example="Vector databases are database systems specifically designed for storing and retrieving vectors. They allow users to find semantically similar content through similarity search.")
+    metadata: Optional[Dict[str, Any]] = Field({}, description="Document metadata, can contain arbitrary key-value pairs",
+                                              example={"source": "technical_document.pdf", "author": "John Smith", "date": "2024-05-01"})
 
 class DocumentResponse(BaseModel):
     """
-    文档响应模型
+    Document Response Model
     """
-    id: Any = Field(..., description="文档的唯一标识符")
-    content: str = Field(..., description="文档的文本内容")
-    metadata: Optional[Dict[str, Any]] = Field({}, description="文档的元数据")
+    id: Any = Field(..., description="Unique identifier of the document")
+    content: str = Field(..., description="Text content of the document")
+    metadata: Optional[Dict[str, Any]] = Field({}, description="Document metadata")
     
     class Config:
         from_attributes = True
 
 class EmbeddingRequest(BaseModel):
     """
-    生成嵌入向量的请求模型
+    Embedding Vector Generation Request Model
     """
-    text: str = Field(..., description="需要生成嵌入向量的文本内容", 
-                      example="向量搜索是指通过相似度查询在高维向量空间中找到最接近查询向量的文档")
+    text: str = Field(..., description="Text content for generating embedding vector", 
+                      example="Vector search refers to finding documents in a high-dimensional vector space that are closest to the query vector based on similarity")
 
 class EmbeddingResponse(BaseModel):
     """
-    嵌入向量的响应模型
+    Embedding Vector Response Model
     """
-    embedding: List[float] = Field(..., description="生成的嵌入向量，通常是一个浮点数数组")
+    embedding: List[float] = Field(..., description="Generated embedding vector, typically an array of floating-point numbers")
 
 class CompletionRequest(BaseModel):
     """
-    文本补全请求模型
+    Text Completion Request Model
     """
-    prompt: str = Field(..., description="需要补全的文本提示", 
-                       example="请解释什么是向量数据库以及它的主要优势")
-    use_context: bool = Field(False, description="是否使用上下文文档辅助生成")
-    context_query: Optional[str] = Field(None, description="用于检索上下文的查询文本，仅当use_context为true时有效",
-                                        example="向量数据库 优势 特点")
-    max_context_docs: int = Field(5, description="最大上下文文档数量，建议1-10之间", ge=1, le=20)
+    prompt: str = Field(..., description="Text prompt to be completed", 
+                       example="Please explain what a vector database is and its main advantages")
+    use_context: bool = Field(False, description="Whether to use context documents to assist generation")
+    context_query: Optional[str] = Field(None, description="Query text for retrieving context, only effective when use_context is true",
+                                        example="vector database advantages features")
+    max_context_docs: int = Field(5, description="Maximum number of context documents, recommended between 1-10", ge=1, le=20)
 
 class CompletionResponse(BaseModel):
     """
-    文本补全响应模型
+    Text Completion Response Model
     """
-    completion: str = Field(..., description="生成的补全文本")
-    debug_info: Optional[Dict[str, Any]] = Field(None, description="调试信息，仅当请求中设置debug=true时返回")
+    completion: str = Field(..., description="Generated completion text")
+    debug_info: Optional[Dict[str, Any]] = Field(None, description="Debug information, only returned when debug=true is set in the request")
 
 class QueryRequest(BaseModel):
     """
-    查询请求模型
+    Query Request Model
     """
-    query: str = Field(..., description="搜索查询文本，系统会为此生成嵌入向量", 
-                      example="向量搜索的工作原理是什么？")
-    limit: int = Field(5, description="返回结果的最大数量，默认为5，建议1-20之间", ge=1, le=20)
+    query: str = Field(..., description="Search query text, for which an embedding vector will be generated", 
+                      example="How does vector search work?")
+    limit: int = Field(5, description="Maximum number of results to return, default is 5, recommended between 1-20", ge=1, le=20)
 
 class QueryResponse(BaseModel):
     """
-    查询响应模型
+    Query Response Model
     """
-    results: List[Dict[str, Any]] = Field(..., description="查询结果列表，每个结果包含文档内容、元数据和相似度分数")
-    context: Optional[str] = Field(None, description="为LLM准备的上下文文本，由结果内容合并而成")
-    summary: Optional[str] = Field(None, description="对查询结果的摘要分析") 
+    results: List[Dict[str, Any]] = Field(..., description="List of query results, each containing document content, metadata, and similarity score")
+    context: Optional[str] = Field(None, description="Context text prepared for LLM, merged from result contents")
+    summary: Optional[str] = Field(None, description="Summary analysis of query results") 

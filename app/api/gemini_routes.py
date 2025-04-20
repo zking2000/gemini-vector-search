@@ -24,46 +24,46 @@ from app.models.api_models import (
 from app.services.gemini_service import GeminiService
 from app.services.vector_service import VectorService
 
-# 创建一个统一的路由器，不再需要分开认证和非认证
+# Create a unified router, no longer need separate authenticated and non-authenticated routes
 router = APIRouter(prefix="/api/v1")
 health_router = APIRouter(prefix="/api/v1")
 
-# 创建服务实例
+# Create service instances
 gemini_service = GeminiService()
 vector_service = VectorService()
 
-# 健康检查端点 - 不需要认证
+# Health check endpoint - no authentication required
 @health_router.get("/health", 
-                  summary="API健康检查", 
-                  description="检查API服务是否正常运行，无需认证",
-                  response_description="返回API服务的健康状态和当前时间戳")
+                  summary="API Health Check", 
+                  description="Check if the API service is running properly, no authentication required",
+                  response_description="Returns the health status of the API service and the current timestamp")
 async def health():
     """
-    健康检查端点，用于验证服务是否正常运行
+    Health check endpoint to verify if the service is running properly
     
-    不需要认证，可用于监控系统检查API可用性
+    No authentication required, can be used by monitoring systems to check API availability
     
-    返回:
-        dict: 包含状态和时间戳的字典
+    Returns:
+        dict: Dictionary containing status and timestamp
     """
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
-# 数据库状态端点 - 不需要认证
+# Database status endpoint - no authentication required
 @health_router.get("/database-status", 
-                  summary="数据库连接状态", 
-                  description="检查数据库连接状态，无需认证",
-                  response_description="返回数据库连接状态和当前时间戳")
+                  summary="Database Connection Status", 
+                  description="Check database connection status, no authentication required",
+                  response_description="Returns database connection status and current timestamp")
 async def database_status():
     """
-    检查数据库连接状态
+    Check database connection status
     
-    不需要认证，可用于监控系统检查API可用性
+    No authentication required, can be used by monitoring systems to check API availability
     
-    返回:
-        dict: 包含数据库连接状态和时间戳的字典
+    Returns:
+        dict: Dictionary containing database connection status and timestamp
         
-    异常:
-        HTTPException: 如果数据库连接失败
+    Exceptions:
+        HTTPException: If database connection fails
     """
     try:
         with engine.connect() as connection:
@@ -74,205 +74,205 @@ async def database_status():
                     "timestamp": datetime.now().isoformat()
                 }
     except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail=f"数据库连接失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
 
-# 以下所有端点都不需要认证
+# All endpoints below do not require authentication
 
 @router.post("/embedding", 
             response_model=EmbeddingResponse, 
-            summary="生成文本嵌入向量", 
-            description="将文本转换为嵌入向量表示，用于向量检索",
-            response_description="返回生成的向量表示")
+            summary="Generate Text Embedding Vector", 
+            description="Convert text to embedding vector representation for vector retrieval",
+            response_description="Returns the generated vector representation")
 async def create_embedding(
     request: EmbeddingRequest,
 ):
     """
-    生成文本的嵌入向量
+    Generate embedding vectors for text
     
-    使用Gemini嵌入模型将输入文本转换为向量表示，用于相似度搜索
+    Use Gemini embedding model to convert input text to vector representation for similarity search
     
-    参数:
-        request: 包含待转换文本的请求对象
+    Parameters:
+        request: Request object containing the text to be converted
         
-    返回:
-        EmbeddingResponse: 包含嵌入向量的响应对象
+    Returns:
+        EmbeddingResponse: Response object containing the embedding vector
         
-    异常:
-        HTTPException: 如果嵌入生成失败
+    Exceptions:
+        HTTPException: If embedding generation fails
     """
     try:
         embedding = await gemini_service.generate_embedding(request.text)
         return {"embedding": embedding}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"生成嵌入失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Embedding generation failed: {str(e)}")
 
 @router.post("/completion", 
             response_model=CompletionResponse, 
-            summary="生成文本补全", 
-            description="使用Gemini模型生成文本补全，可选择是否使用向量数据库中的相关文档作为上下文",
-            response_description="返回生成的补全文本")
+            summary="Generate Text Completion", 
+            description="Use Gemini model to generate text completion, optionally using relevant documents from the vector database as context",
+            response_description="Returns the generated completion text")
 async def create_completion(
     request: CompletionRequest,
     db: Session = Depends(get_db),
 ):
     """
-    生成文本补全
+    Generate text completion
     
-    使用Gemini模型生成文本补全，可选择是否使用向量数据库中的相关文档作为上下文
+    Use Gemini model to generate text completion, optionally using relevant documents from the vector database as context
     
-    参数:
-        request: 包含提示文本和上下文配置的请求对象
-        db: 数据库会话
+    Parameters:
+        request: Request object containing prompt text and context configuration
+        db: Database session
         
-    返回:
-        CompletionResponse: 包含生成的补全文本的响应对象
+    Returns:
+        CompletionResponse: Response object containing the generated completion text
         
-    异常:
-        HTTPException: 如果生成补全失败
+    Exceptions:
+        HTTPException: If completion generation fails
     """
     try:
         context = None
         
-        # 如果需要使用上下文
+        # If context is needed
         if request.use_context and request.context_query:
-            # 获取相似文档
+            # Get similar documents
             similar_docs = await vector_service.search_similar(
                 db, 
                 request.context_query, 
                 request.max_context_docs
             )
             
-            # 准备上下文
+            # Prepare context
             if similar_docs:
                 context = await gemini_service.prepare_context(request.context_query, similar_docs)
         
-        # 生成补全
+        # Generate completion
         completion = await gemini_service.generate_completion(request.prompt, context)
         return {"completion": completion}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"生成补全失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Completion generation failed: {str(e)}")
 
 @router.post("/documents", 
             response_model=DocumentResponse, 
-            summary="添加文档", 
-            description="将单个文档添加到向量数据库，生成其嵌入向量用于后续检索",
-            response_description="返回添加的文档信息")
+            summary="Add Document", 
+            description="Add a single document to the vector database, generating its embedding vector for later retrieval",
+            response_description="Returns information about the added document")
 async def add_document(
     request: DocumentCreate,
     db: Session = Depends(get_db),
 ):
     """
-    添加文档到向量数据库
+    Add document to the vector database
     
-    将单个文档添加到数据库，生成其嵌入向量用于后续检索
+    Add a single document to the database, generating its embedding vector for later retrieval
     
-    参数:
-        request: 包含文档内容和元数据的请求对象
-        db: 数据库会话
+    Parameters:
+        request: Request object containing document content and metadata
+        db: Database session
         
-    返回:
-        DocumentResponse: 包含新添加文档信息的响应对象
+    Returns:
+        DocumentResponse: Response object containing information about the newly added document
         
-    异常:
-        HTTPException: 如果添加文档失败
+    Exceptions:
+        HTTPException: If adding the document fails
     """
     try:
         document = await vector_service.add_document(db, request.content, request.metadata)
         return document
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"添加文档失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to add document: {str(e)}")
 
 @router.post("/query", 
             response_model=QueryResponse, 
-            summary="查询相似文档", 
-            description="在向量数据库中搜索与查询文本相似的文档，并返回详细信息",
-            response_description="返回相似文档列表、上下文和摘要分析")
+            summary="Query Similar Documents", 
+            description="Search for documents similar to the query text in the vector database, and return detailed information",
+            response_description="Returns a list of similar documents, context, and summary analysis")
 async def query_documents(
     request: QueryRequest,
-    source_filter: Optional[str] = Query(None, description="按文档来源筛选结果", example="document1.pdf"),
+    source_filter: Optional[str] = Query(None, description="Filter results by document source", example="document1.pdf"),
     db: Session = Depends(get_db),
 ):
     """
-    查询向量数据库中的相似文档
+    Query similar documents in the vector database
     
-    在向量数据库中搜索与查询文本相似的文档，并返回详细信息、上下文和摘要分析
+    Search for documents similar to the query text in the vector database, and return detailed information, context, and summary analysis
     
-    参数:
-        request: 包含查询文本和配置的请求对象
-        source_filter: 可选的文档来源筛选条件
-        db: 数据库会话
+    Parameters:
+        request: Request object containing query text and configuration
+        source_filter: Optional document source filter condition
+        db: Database session
         
-    返回:
-        QueryResponse: 包含相似文档、上下文和摘要的响应对象
+    Returns:
+        QueryResponse: Response object containing similar documents, context, and summary
         
-    异常:
-        HTTPException: 如果查询失败
+    Exceptions:
+        HTTPException: If the query fails
     """
     try:
         results = await vector_service.search_similar(db, request.query, request.limit, source_filter)
         return {"results": results}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"查询相似文档失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to query similar documents: {str(e)}")
 
 @router.post("/integration", 
             response_model=CompletionResponse, 
-            summary="集成查询", 
-            description="结合向量检索和文本生成的一体化API，可按文档来源筛选结果并返回详细调试信息",
-            response_description="返回基于相关文档内容生成的回答")
+            summary="Integration Query", 
+            description="Integrated API combining vector retrieval and text generation, can filter results by document source and return detailed debugging information",
+            response_description="Returns answer generated based on related document content")
 async def integration_query(
     request: CompletionRequest,
-    source_filter: Optional[str] = Query(None, description="按文档来源筛选结果", example="document1.pdf"),
-    debug: bool = Query(False, description="返回详细的调试信息"),
-    force_use_documents: bool = Query(False, description="强制使用文档内容回答，即使没有找到高相似度的匹配"),
+    source_filter: Optional[str] = Query(None, description="Filter results by document source", example="document1.pdf"),
+    debug: bool = Query(False, description="Return detailed debugging information"),
+    force_use_documents: bool = Query(False, description="Force use document content answer even if no high similarity match found"),
     db: Session = Depends(get_db),
 ):
     """
-    集成API：向量查询并将结果添加到提示中
+    Integrated API: Vector query and result addition to prompt
     
-    结合向量检索和文本生成的一体化API，可按文档来源筛选结果并返回详细调试信息
+    Integrated API combining vector retrieval and text generation, can filter results by document source and return detailed debugging information
     
-    参数:
-        request: 包含提示文本和上下文查询的请求对象
-        source_filter: 按文档来源筛选结果，例如特定的PDF文件名
-        debug: 是否返回详细的调试信息
-        force_use_documents: 强制使用文档内容回答，即使没有找到高相似度的匹配
-        db: 数据库会话
+    Parameters:
+        request: Request object containing prompt text and context query
+        source_filter: Filter results by document source, for example specific PDF file name
+        debug: Whether to return detailed debugging information
+        force_use_documents: Force use document content answer even if no high similarity match found
+        db: Database session
         
-    返回:
-        CompletionResponse: 包含生成的回答的响应对象，如启用debug则包含调试信息
+    Returns:
+        CompletionResponse: Response object containing the generated answer, if debug enabled then includes debugging information
         
-    异常:
-        HTTPException: 如果集成查询失败
+    Exceptions:
+        HTTPException: If integration query fails
     """
     try:
-        print(f"收到集成查询请求: {request.prompt}")
-        print(f"上下文查询: {request.context_query or request.prompt}")
+        print(f"Received integration query request: {request.prompt}")
+        print(f"Context query: {request.context_query or request.prompt}")
         
-        # 判断是否为中文查询
+        # Check if it's a Chinese query
         is_chinese_query = any('\u4e00' <= c <= '\u9fff' for c in request.prompt)
-        print(f"是否为中文查询: {is_chinese_query}")
+        print(f"Is Chinese query: {is_chinese_query}")
         
-        # 先查询相关文档
+        # First query related documents
         search_query = request.context_query or request.prompt
         
-        # 对搜索查询进行扩展，提高对中文内容的匹配能力
+        # Expand search query to improve matching ability for Chinese content
         expanded_terms = []
         if "道教" in search_query:
             expanded_terms = ["道教", "老子", "道德经", "太上老君", "张道陵", "太极", "阴阳", "天师道", "五斗米道", "全真道"]
         elif "佛教" in search_query:
             expanded_terms = ["佛教", "释迦牟尼", "佛陀", "菩萨", "禅宗", "佛经", "如来", "佛祖", "涅槃", "菩提"]
         elif is_chinese_query:
-            # 为其他中文查询添加一些常见的中文哲学和宗教术语
+            # Add some common Chinese philosophy and religious terms for other Chinese queries
             expanded_terms = ["中国", "哲学", "历史", "传统", "文化", "典籍", "经典"]
         
         if expanded_terms:
             search_query = f"{search_query} {' '.join(expanded_terms)}"
-            print(f"扩展后的搜索查询: {search_query}")
+            print(f"Expanded search query: {search_query}")
         
-        # 增加返回的文档数量，提高找到相关内容的概率
+        # Increase return document count to improve probability of finding related content
         max_context_docs = request.max_context_docs
         if is_chinese_query:
-            max_context_docs = max(max_context_docs, 10)  # 中文查询至少返回10个文档
+            max_context_docs = max(max_context_docs, 10)  # Chinese query at least returns 10 documents
         
         similar_docs = await vector_service.search_similar(
             db, 
@@ -281,63 +281,63 @@ async def integration_query(
             source_filter
         )
         
-        print(f"找到 {len(similar_docs)} 个相关文档")
+        print(f"Found {len(similar_docs)} related documents")
         
-        # 为调试目的，打印前几个文档的内容片段
+        # For debugging purposes, print content snippets of the first few documents
         if similar_docs:
-            print("前3个文档内容片段:")
+            print("First 3 document content snippets:")
             for i, doc in enumerate(similar_docs[:3]):
                 content_preview = doc.get("content", "")[:100].replace("\n", " ")
                 similarity = doc.get("similarity", 0)
-                print(f"  [{i+1}] 相似度:{similarity:.4f} - {content_preview}...")
+                print(f"  [{i+1}] Similarity: {similarity:.4f} - {content_preview}...")
         
-        # 准备上下文
+        # Prepare context
         context = None
         if similar_docs:
             context = await gemini_service.prepare_context(
                 request.context_query or request.prompt, 
                 similar_docs
             )
-            print(f"生成上下文，长度: {len(context) if context else 0}")
+            print(f"Generated context, length: {len(context) if context else 0}")
         else:
-            print("未找到相关文档")
+            print("No related documents found")
         
-        # 生成补全
+        # Generate completion
         completion_prompt = request.prompt
         if context:
             if is_chinese_query:
                 completion_prompt = f"""
-你是一个知识渊博的助手，特别擅长回答中国历史和文化问题。
-请基于以下参考资料回答用户的问题。如果参考资料中没有相关信息，请明确指出并说明哪些信息是缺失的。
+You are a knowledgeable assistant, especially skilled at answering questions about Chinese history and culture.
+Please answer the user's question based on the following reference material. If the reference material does not contain relevant information, please clearly indicate which information is missing.
 
-参考资料:
+Reference material:
 {context}
 
-用户问题: {request.prompt}
+User question: {request.prompt}
 
-请用中文回答，并尽量详细解释相关概念。如果参考资料不足，请说明你的回答是基于一般知识而非系统中的文档。
+Please answer in Chinese and try to explain related concepts in detail. If the reference material is insufficient, please indicate that your answer is based on general knowledge rather than system documents.
 """
             else:
                 completion_prompt = f"""
-你是一个知识渊博的助手，特别擅长回答历史和文化问题。
-请基于以下参考资料回答用户的问题。如果参考资料中没有相关信息，请明确指出。
+You are a knowledgeable assistant, especially skilled at answering questions about history and culture.
+Please answer the user's question based on the following reference material. If the reference material does not contain relevant information, please clearly indicate which information is missing.
 
-参考资料:
+Reference material:
 {context}
 
-用户问题: {request.prompt}
+User question: {request.prompt}
 """
         else:
-            # 如果没有找到相关文档但用户强制要求使用文档内容
+            # If no related documents found but user forces use of document content
             if force_use_documents:
-                # 获取系统中现有的文档
+                # Get existing documents in the system
                 try:
-                    # 查询文档总数
+                    # Query document count
                     doc_count = db.execute(text("SELECT COUNT(*) FROM documents")).scalar()
                     
-                    # 如果有文档，尝试获取一些样本内容
+                    # If there are documents, try to get some sample content
                     if doc_count > 0:
-                        # 获取最近的几个文档标题和来源
+                        # Get recent document titles and sources
                         recent_docs = db.execute(
                             text("SELECT id, title, doc_metadata FROM documents ORDER BY id DESC LIMIT 5")
                         ).fetchall()
@@ -354,29 +354,29 @@ async def integration_query(
                                 except:
                                     pass
                             
-                            source = metadata.get("source", "未知来源")
-                            doc_samples.append(f"- ID: {doc.id}, 来源: {source}, 标题: {doc.title[:50]}...")
+                            source = metadata.get("source", "Unknown source")
+                            doc_samples.append(f"- ID: {doc.id}, Source: {source}, Title: {doc.title[:50]}...")
                         
                         doc_list = "\n".join(doc_samples)
                         
                         if is_chinese_query:
                             completion_prompt = f"""
-你是一个知识渊博的助手，特别擅长回答中国历史和文化问题。
+You are a knowledgeable assistant, especially skilled at answering questions about Chinese history and culture.
 
-我检索了数据库中的所有文档（共{doc_count}个），但未能找到与"{request.prompt}"直接相关的内容。
-以下是数据库中的一些文档示例:
+I searched through all documents in the database (total {doc_count}) but couldn't find any directly relevant to "{request.prompt}".
+Here are some sample documents in the system:
 {doc_list}
 
-由于您选择了强制使用文档模式，我必须基于系统中的文档来回答。然而，系统中可能没有包含与这个问题相关的信息。
+Since you've selected the force_use_documents mode, I must base my answer on documents in the system. However, the system may not contain information related to this question.
 
-请对比您的问题和系统中的文档内容，考虑：
-1. 是否需要重新上传包含相关信息的文档
-2. 是否需要调整查询的表述方式以更好地匹配现有文档
-3. 是否需要扩展系统的文档库来涵盖这个主题
+Please compare your question with the documents in the system and consider:
+1. Whether you need to upload documents containing the relevant information
+2. Whether you need to adjust your query wording to better match existing documents
+3. Whether you need to expand the document library to cover this topic
 
-用户问题: {request.prompt}
+User question: {request.prompt}
 
-请用中文回答，并明确指出系统中可能缺少相关文档。
+Please clearly indicate that the system may be missing relevant documents.
 """
                         else:
                             completion_prompt = f"""
@@ -398,36 +398,36 @@ User question: {request.prompt}
 Please clearly indicate that the system may be missing relevant documents.
 """
                 except Exception as e:
-                    print(f"获取文档统计信息时出错: {e}")
-                    # 使用默认提示
+                    print(f"Failed to get document statistics: {e}")
+                    # Use default prompt
             
             if not force_use_documents:
                 if is_chinese_query:
                     completion_prompt = f"""
-你是一个知识渊博的助手，特别擅长回答中国历史和文化问题。
-我没有找到任何与"{request.prompt}"相关的参考资料。请基于你的知识回答，但请明确指出你的回答不是基于系统中的文档内容。
+You are a knowledgeable assistant, especially skilled at answering questions about Chinese history and culture.
+I couldn't find any reference material related to "{request.prompt}". Please answer based on your knowledge, but please clearly indicate that your answer is not based on system document content.
 
-可能的原因包括:
-1. 数据库中可能没有包含相关主题的文档
-2. 查询的表述方式与文档内容不匹配
-3. 相关文档的向量表示与查询的向量表示相似度不够高
+Possible reasons include:
+1. There may be no documents related to this topic in the database
+2. The query wording does not match the document content
+3. The vector representation of the related documents is not similar enough to the query vector representation
 
-用户问题: {request.prompt}
+User question: {request.prompt}
 
-请用中文回答，并尽量详细解释相关概念。同时，请明确说明你的回答是基于一般知识而非系统中的文档。
+Please answer in Chinese and try to explain related concepts in detail. At the same time, please clearly indicate that your answer is based on general knowledge rather than system documents.
 """
                 else:
                     completion_prompt = f"""
-你是一个知识渊博的助手，特别擅长回答历史和文化问题。
-我没有找到任何与"{request.prompt}"相关的参考资料。请基于你的知识回答，但请明确指出你的回答不是基于系统中的文档内容。
+You are a knowledgeable assistant, especially skilled at answering questions about history and culture.
+I couldn't find any reference material related to "{request.prompt}". Please answer based on your knowledge, but please clearly indicate that your answer is not based on system document content.
 
-用户问题: {request.prompt}
+User question: {request.prompt}
 """
         
-        print(f"生成补全提示，长度: {len(completion_prompt)}")
+        print(f"Generated completion prompt, length: {len(completion_prompt)}")
         completion = await gemini_service.generate_completion(completion_prompt)
         
-        # 如果启用调试模式，返回更多信息
+        # If debug mode enabled, return more information
         if debug:
             return {
                 "completion": completion,
@@ -444,7 +444,7 @@ Please clearly indicate that the system may be missing relevant documents.
                             "source": d.get("metadata", {}).get("source", "") or 
                                      d.get("source", "") or 
                                      d.get("metadata", {}).get("pdf_filename", "") or 
-                                     "文档ID: " + str(d.get("id", "未知ID"))
+                                     "Document ID: " + str(d.get("id", "Unknown ID"))
                         } 
                         for d in similar_docs[:5]
                     ] if similar_docs else []
@@ -454,38 +454,38 @@ Please clearly indicate that the system may be missing relevant documents.
         return {"completion": completion}
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"集成查询失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Integration query failed: {str(e)}")
 
 @router.get("/documents", 
            response_model=List[Dict[str, Any]], 
-           summary="获取文档列表", 
-           description="获取文档列表，支持分页和按来源筛选",
-           response_description="返回文档列表")
+           summary="Get Document List", 
+           description="Get document list, supports paging and source filtering",
+           response_description="Returns document list")
 async def get_documents(
     db: Session = Depends(get_db),
-    limit: int = Query(20, ge=1, le=100, description="返回的最大文档数量"),
-    offset: int = Query(0, ge=0, description="分页偏移量"),
-    source: Optional[str] = Query(None, description="按文档来源筛选")
+    limit: int = Query(20, ge=1, le=100, description="Maximum number of documents to return"),
+    offset: int = Query(0, ge=0, description="Page offset for paging query"),
+    source: Optional[str] = Query(None, description="Filter by document source, for example specific PDF file name")
 ):
     """
-    获取文档列表，支持分页和筛选
+    Get document list, supports paging and filtering
     
-    获取存储在数据库中的文档列表，支持分页和按来源筛选
+    Get document list from the database, supports paging and filtering by source
     
-    参数:
-        db: 数据库会话
-        limit: 返回的最大文档数量，范围1-100
-        offset: 分页偏移量，用于分页查询
-        source: 按文档来源筛选，例如特定的PDF文件名
+    Parameters:
+        db: Database session
+        limit: Maximum number of documents to return, range 1-100
+        offset: Page offset for paging query
+        source: Filter by document source, for example specific PDF file name
         
-    返回:
-        List[Dict]: 文档列表，每个文档包含ID、标题、内容、元数据和创建时间
+    Returns:
+        List[Dict]: Document list, each document contains ID, title, content, metadata, and creation time
         
-    异常:
-        HTTPException: 如果获取文档列表失败
+    Exceptions:
+        HTTPException: If failed to get document list
     """
     try:
-        # 构建查询条件
+        # Build query conditions
         query = "SELECT id, title, doc_metadata, created_at FROM documents"
         params = {}
         
@@ -493,148 +493,148 @@ async def get_documents(
             query += " WHERE doc_metadata::text LIKE :source"
             params["source"] = f"%{source}%"
             
-        # 添加排序和分页
+        # Add sorting and paging
         query += " ORDER BY id DESC LIMIT :limit OFFSET :offset"
         params["limit"] = limit
         params["offset"] = offset
         
-        # 执行查询
+        # Execute query
         result = db.execute(text(query), params).fetchall()
         
-        # 处理结果
+        # Process results
         documents = []
         for row in result:
-            # 安全处理doc_metadata
+            # Safe handling doc_metadata
             try:
                 metadata = row.doc_metadata
-                # 如果是字符串，尝试解析为JSON
+                # If it's a string, try to parse as JSON
                 if isinstance(metadata, str):
                     try:
                         metadata = json.loads(metadata)
                     except json.JSONDecodeError as e:
-                        print(f"解析文档id={row.id}的元数据失败: {e}")
+                        print(f"Failed to parse document id={row.id} metadata: {e}")
                         metadata = {}
-                # 如果不是字典类型，使用空字典
+                # If not dictionary type, use empty dictionary
                 elif not isinstance(metadata, dict):
-                    print(f"文档id={row.id}的元数据不是有效的JSON或字典: {type(metadata)}")
+                    print(f"Document id={row.id} metadata is not valid JSON or dictionary: {type(metadata)}")
                     metadata = {}
                 
-                # 删除嵌入向量以减少响应大小
+                # Delete embedding vector to reduce response size
                 if "_embedding" in metadata:
                     del metadata["_embedding"]
             except Exception as e:
-                print(f"处理文档id={row.id}的元数据时出错: {e}")
+                print(f"Failed to handle document id={row.id} metadata: {e}")
                 metadata = {}
                 
             documents.append({
                 "id": row.id,
                 "title": row.title,
-                "content": row.title,  # 这里使用title作为content返回
+                "content": row.title,  # Use title as content return
                 "metadata": metadata,
                 "created_at": row.created_at.isoformat() if row.created_at else None
             })
             
         return documents
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取文档列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get document list: {str(e)}")
 
 @router.post("/upload-pdf", 
             response_model=Dict[str, Any], 
-            summary="上传PDF文件", 
-            description="上传PDF文件，解析内容并存储到向量数据库，支持智能分块",
-            response_description="返回处理结果，包括文件名、处理的块数量和文档ID列表")
+            summary="Upload PDF File", 
+            description="Upload PDF file, parse content and store to vector database, supports intelligent chunking",
+            response_description="Returns processing result, including file name, processed chunk count, and document ID list")
 async def upload_pdf(
     file: UploadFile = File(...),
-    use_intelligent_chunking: bool = Query(True, description="是否使用Gemini进行智能分块"),
-    chunk_size: int = Query(1000, description="如果不使用智能分块，固定分块大小"),
-    overlap: int = Query(200, description="如果不使用智能分块，固定重叠大小"),
-    clear_existing: bool = Query(False, description="上传前是否清空数据库中的文档"),
+    use_intelligent_chunking: bool = Query(True, description="Whether to use Gemini for intelligent chunking"),
+    chunk_size: int = Query(1000, description="If not using intelligent chunking, fixed chunk size"),
+    overlap: int = Query(200, description="If not using intelligent chunking, fixed overlap size"),
+    clear_existing: bool = Query(False, description="Clear documents in database before upload"),
     db: Session = Depends(get_db),
 ):
-    """上传PDF文件，解析内容并存储到向量数据库
+    """Upload PDF file, parse content and store to vector database
     
-    上传PDF文件，提取文本内容，分块处理并存储到向量数据库用于后续检索
+    Upload PDF file, extract text content, process and store to vector database for later retrieval
     
-    参数:
-        file: 要上传的PDF文件
-        use_intelligent_chunking: 是否使用Gemini进行智能分块
-        chunk_size: 如果不使用智能分块，固定分块大小
-        overlap: 如果不使用智能分块，固定重叠大小
-        clear_existing: 上传前是否清空数据库，默认为False
-        db: 数据库会话
+    Parameters:
+        file: PDF file to upload
+        use_intelligent_chunking: Whether to use Gemini for intelligent chunking
+        chunk_size: If not using intelligent chunking, fixed chunk size
+        overlap: If not using intelligent chunking, fixed overlap size
+        clear_existing: Clear database before upload, default False
+        db: Database session
         
-    返回:
-        Dict: 包含处理结果的字典，包括文件名、处理的块数量、文档ID列表等
+    Returns:
+        Dict: Dictionary containing processing result, including file name, processed chunk count, document ID list, etc
         
-    异常:
-        HTTPException: 如果处理PDF文件失败
+    Exceptions:
+        HTTPException: If processing PDF file fails
     """
     try:
-        # 如果指定了清空数据库
+        # If specified clear database
         if clear_existing:
             try:
-                # 检查document_chunks表是否存在
+                # Check if document_chunks table exists
                 inspector = inspect(db.bind)
                 tables = inspector.get_table_names()
                 chunks_exists = "document_chunks" in tables
                 
-                # 使用CASCADE参数处理外键依赖
+                # Use CASCADE parameter to handle foreign key dependencies
                 if chunks_exists:
                     db.execute(text("TRUNCATE TABLE documents CASCADE"))
                 else:
                     db.execute(text("TRUNCATE TABLE documents RESTART IDENTITY"))
                 db.commit()
-                print(f"已清空数据库，准备导入新文档: {file.filename}")
+                print(f"Cleared database, preparing to import new document: {file.filename}")
             except Exception as e:
                 db.rollback()
-                print(f"清空数据库时出错: {e}")
-                # 继续处理，不阻止上传
+                print(f"Failed to clear database: {e}")
+                # Continue processing, do not block upload
         
-        # 检查文件类型
+        # Check file type
         if not file.filename.endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="只支持PDF文件")
+            raise HTTPException(status_code=400, detail="Only PDF files are supported")
             
-        # 读取PDF内容
+        # Read PDF content
         content = await file.read()
         pdf_reader = PyPDF2.PdfReader(BytesIO(content))
         
-        # 提取文本
+        # Extract text
         text = ""
         for page in pdf_reader.pages:
             page_text = page.extract_text()
             if page_text:
                 text += page_text + "\n"
             
-        # 如果文本为空
+        # If text is empty
         if not text.strip():
-            raise HTTPException(status_code=400, detail="无法从PDF提取文本")
+            raise HTTPException(status_code=400, detail="Cannot extract text from PDF")
         
-        # 存储到向量数据库的文档ID
+        # Document ID to store in vector database
         document_ids = []
             
-        # 尝试使用智能分块策略
-        chunking_method = "fixed_size"  # 默认为固定分块
+        # Try using intelligent chunking strategy
+        chunking_method = "fixed_size"  # Default to fixed chunk
         
         if use_intelligent_chunking:
             try:
-                print("开始智能分块...")
+                print("Starting intelligent chunking...")
                 chunks = await gemini_service.intelligent_chunking(text, "pdf")
                 
                 if chunks and len(chunks) > 0:
-                    print(f"智能分块成功，生成了{len(chunks)}个块")
+                    print(f"Intelligent chunking succeeded, generated {len(chunks)} chunks")
                     chunking_method = "intelligent"
                     
-                    # 存储分块内容
-                    batch_size = 10  # 每批处理的块数
+                    # Store chunk content
+                    batch_size = 10  # Chunks to process per batch
                     
-                    # 优化：如果块太多，先进行采样测试以减少API调用
+                    # Optimization: If too many chunks, first perform sampling test to reduce API calls
                     if len(chunks) > 50:
-                        print(f"文档块数较多 ({len(chunks)}个)，先处理样本块以避免超出配额")
-                        # 取样本块进行处理（前5个、中间5个和最后5个）
+                        print(f"Document has many chunks ({len(chunks)}), first process sample chunks to avoid exceeding quota")
+                        # Take sample chunks for processing (first 5, middle 5, and last 5)
                         sample_indices = list(range(0, 5)) + list(range(len(chunks)//2-2, len(chunks)//2+3)) + list(range(len(chunks)-5, len(chunks)))
                         sample_chunks = [chunks[i] for i in sample_indices]
                         
-                        # 处理样本块
+                        # Process sample chunks
                         for i, chunk_index in enumerate(sample_indices):
                             chunk_data = chunks[chunk_index]
                             document = await vector_service.add_document(
@@ -645,14 +645,14 @@ async def upload_pdf(
                                     "chunk": chunk_index + 1,
                                     "total_chunks": len(chunks),
                                     "strategy": "intelligent_chunking_sample",
-                                    "pdf_filename": file.filename,  # 添加文件名字段
-                                    "import_timestamp": datetime.now().isoformat(),  # 添加导入时间戳
+                                    "pdf_filename": file.filename,  # Add file name field
+                                    "import_timestamp": datetime.now().isoformat(),  # Add import timestamp
                                     **chunk_data.get("metadata", {})
                                 }
                             )
                             document_ids.append(document.id)
                             
-                        # 只返回样本块的结果
+                        # Return only sample chunk results
                         return {
                             "success": True,
                             "filename": file.filename,
@@ -661,15 +661,15 @@ async def upload_pdf(
                             "chunking_method": "intelligent_sampling",
                             "total_chunks": len(chunks),
                             "processed_chunks": len(sample_indices),
-                            "note": "由于文档块数较多，只处理了部分样本块以避免API配额限制"
+                            "note": "Since document has many chunks, only processed some sample chunks to avoid API quota limit"
                         }
                     
-                    # 如果块数适中，按批处理所有块
+                    # If chunk count is moderate, process all chunks in batches
                     for i in range(0, len(chunks), batch_size):
                         batch = chunks[i:i+batch_size]
-                        print(f"处理批次 {i//batch_size + 1}/{(len(chunks) + batch_size - 1)//batch_size}, 大小: {len(batch)}")
+                        print(f"Processing batch {i//batch_size + 1}/{(len(chunks) + batch_size - 1)//batch_size}, size: {len(batch)}")
                         
-                        # 并行处理批次
+                        # Process batch in parallel
                         tasks = []
                         for j, chunk_data in enumerate(batch):
                             chunk_index = i + j
@@ -681,24 +681,24 @@ async def upload_pdf(
                                     "chunk": chunk_index + 1,
                                     "total_chunks": len(chunks),
                                     "strategy": "intelligent_chunking",
-                                    "pdf_filename": file.filename,  # 添加文件名字段
-                                    "import_timestamp": datetime.now().isoformat(),  # 添加导入时间戳
+                                    "pdf_filename": file.filename,  # Add file name field
+                                    "import_timestamp": datetime.now().isoformat(),  # Add import timestamp
                                     **chunk_data.get("metadata", {})
                                 }
                             )
                             tasks.append(task)
                         
-                        # 等待批次完成
+                        # Wait for batch completion
                         batch_results = await asyncio.gather(*tasks, return_exceptions=True)
                         
-                        # 处理结果
+                        # Process results
                         for result in batch_results:
                             if isinstance(result, Exception):
-                                print(f"处理块时出错: {result}")
+                                print(f"Failed to process chunk: {result}")
                             else:
                                 document_ids.append(result.id)
                         
-                        # 在批次之间短暂延迟，避免过快发送请求
+                        # Brief delay between batches to avoid sending requests too quickly
                         if i + batch_size < len(chunks):
                             await asyncio.sleep(1)
                     
@@ -710,12 +710,12 @@ async def upload_pdf(
                         "chunking_method": chunking_method
                     }
                 else:
-                    print("智能分块返回空结果，回退到固定分块")
+                    print("Intelligent chunking returned empty result, falling back to fixed chunk")
             except Exception as e:
-                print(f"智能分块失败: {e}，回退到固定分块")
+                print(f"Intelligent chunking failed: {e}, falling back to fixed chunk")
         
-        # 使用传统的固定大小分块（作为备选或默认方法）
-        print(f"使用固定分块: chunk_size={chunk_size}, overlap={overlap}")
+        # Use traditional fixed size chunking (as fallback or default method)
+        print(f"Using fixed chunking: chunk_size={chunk_size}, overlap={overlap}")
         chunks = []
         sentences = text.replace('\n', ' ').split('. ')
         current_chunk = ""
@@ -725,15 +725,15 @@ async def upload_pdf(
                 current_chunk += sentence + ". "
             else:
                 chunks.append(current_chunk)
-                # 保留一些重叠，以维持上下文连贯性
+                # Keep some overlap to maintain context continuity
                 current_chunk = current_chunk[-overlap:] if overlap > 0 else ""
                 current_chunk += sentence + ". "
                 
-        # 添加最后一个块
+        # Add last chunk
         if current_chunk:
             chunks.append(current_chunk)
             
-        # 存储到向量数据库
+        # Store to vector database
         for i, chunk in enumerate(chunks):
             document = await vector_service.add_document(
                 db, 
@@ -745,8 +745,8 @@ async def upload_pdf(
                     "strategy": "fixed_size",
                     "chunk_size": chunk_size,
                     "overlap": overlap,
-                    "pdf_filename": file.filename,  # 添加文件名字段
-                    "import_timestamp": datetime.now().isoformat()  # 添加导入时间戳
+                    "pdf_filename": file.filename,  # Add file name field
+                    "import_timestamp": datetime.now().isoformat()  # Add import timestamp
                 }
             )
             document_ids.append(document.id)
@@ -762,109 +762,109 @@ async def upload_pdf(
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"处理PDF文件失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process PDF file: {str(e)}")
 
 @router.post("/analyze-documents", 
             response_model=CompletionResponse, 
-            summary="分析文档内容", 
-            description="深入分析文档内容，提取关键概念和主题",
-            response_description="返回详细的结构化文档分析结果")
+            summary="Analyze Document Content", 
+            description="Deeply analyze document content, extract key concepts and themes",
+            response_description="Returns detailed structured document analysis result")
 async def analyze_documents(
     request: QueryRequest,
     db: Session = Depends(get_db),
 ):
     """
-    深入分析文档内容，提取关键概念和主题
+    Deeply analyze document content, extract key concepts and themes
     
-    检索相关文档并使用Gemini模型提供深入分析，包括关键概念、主题分类和重要信息点
+    Retrieve related documents and use Gemini model for deep analysis, including key concepts, theme classification, and important information points
     
-    参数:
-        request: 包含查询文本和限制数量的请求对象
-        db: 数据库会话
+    Parameters:
+        request: Request object containing query text and limit count
+        db: Database session
         
-    返回:
-        CompletionResponse: 包含详细分析结果的响应对象
+    Returns:
+        CompletionResponse: Response object containing detailed analysis result
         
-    异常:
-        HTTPException: 如果分析文档失败
+    Exceptions:
+        HTTPException: If failed to analyze document
     """
     try:
-        # 首先检索相关文档
+        # First retrieve related documents
         results = await vector_service.search_similar(db, request.query, request.limit)
         
         if not results:
-            return {"completion": "未找到相关文档。请尝试调整查询或增加文档库。"}
+            return {"completion": "No related documents found. Please try adjusting query or increasing document library."}
         
-        # 准备上下文
+        # Prepare context
         context = await gemini_service.prepare_context(request.query, results)
         
-        # 创建详细的分析提示
+        # Create detailed analysis prompt
         analysis_prompt = f"""
-你是一位专业的文档分析专家。请对以下内容进行深入分析，并提取关键主题和概念：
+You are a professional document analysis expert. Please perform deep analysis on the following content and extract key themes and concepts:
 
 {context}
 
-针对查询 "{request.query}"，请提供以下分析：
+For query "{request.query}", please provide the following analysis:
 
-1. 主要概念：列出文档提到的所有关键概念，每个概念配以简短的解释。
-2. 主题分类：将内容按主题进行分类。
-3. 关键要点：总结文档中与查询相关的最重要信息点。
-4. 完整回答：基于文档内容，对用户的查询提供全面且简洁的回答。
+1. Main concepts: List all key concepts mentioned in the document, each with a brief explanation.
+2. Theme classification: Categorize content by theme.
+3. Key points: Summarize the most important information points related to the query from the document.
+4. Complete answer: Provide a comprehensive and concise answer based on document content for the user's query.
 
-注意：如果文档内容被截断或不完整，请在回答中说明。
+Note: If document content is truncated or incomplete, please indicate in the answer.
 """
         
-        # 生成分析
+        # Generate analysis
         analysis = await gemini_service.generate_completion(analysis_prompt)
         
         return {"completion": analysis}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"分析文档失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to analyze document: {str(e)}")
 
 @router.post("/clear-alloydb", 
             response_model=Dict[str, Any], 
-            summary="清空AlloyDB", 
-            description="清空AlloyDB中的所有数据表，这是一个危险操作，需要确认参数",
-            response_description="返回操作结果信息")
-async def clear_alloydb(confirmation: str = Query(..., description="确认字符串，必须为'confirm_clear_alloydb'")):
+            summary="Clear AlloyDB", 
+            description="Clear all data tables in AlloyDB, this is a dangerous operation, need to confirm parameters",
+            response_description="Returns operation result information")
+async def clear_alloydb(confirmation: str = Query(..., description="Confirm string, must be 'confirm_clear_alloydb'")):
     """
-    清空AlloyDB中的所有数据表。极度谨慎使用！
+    Clear all data tables in AlloyDB. Extremely cautious use!
     
-    清空AlloyDB数据库中的所有表数据。为防止意外操作，需要提供确认参数
+    Clear all table data in AlloyDB database. To prevent accidental operations, need to provide confirmation parameter
     
-    参数:
-        confirmation: 确认字符串，必须为'confirm_clear_alloydb'
+    Parameters:
+        confirmation: Confirm string, must be 'confirm_clear_alloydb'
         
-    返回:
-        Dict: 包含操作结果信息的字典
+    Returns:
+        Dict: Dictionary containing operation result information
         
-    异常:
-        HTTPException: 如果确认参数不正确或清空操作失败
+    Exceptions:
+        HTTPException: If confirmation parameter is incorrect or clear operation fails
     """
     if confirmation != "confirm_clear_alloydb":
-        raise HTTPException(status_code=400, detail="需要确认参数才能执行此操作")
+        raise HTTPException(status_code=400, detail="Need to confirm parameters to execute this operation")
     
     try:
         deleted_tables = 0
         table_counts = {}
         
         with engine.connect() as connection:
-            # 获取所有表名
+            # Get all table names
             inspector = inspect(engine)
             tables = inspector.get_table_names()
             
-            # 先删除没有被引用的表(无外键依赖)
+            # First delete tables not referenced (no foreign key dependencies)
             for table in tables:
                 try:
-                    # 获取表中的记录数
+                    # Get record count in table
                     count = connection.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()
                     table_counts[table] = count
                     
-                    # 使用DELETE而不是TRUNCATE
+                    # Use DELETE instead of TRUNCATE
                     connection.execute(text(f"DELETE FROM {table}"))
                     deleted_tables += 1
                 except Exception as e:
-                    print(f"清空表 {table} 时出错: {e}")
+                    print(f"Failed to clear table {table}: {e}")
             
             connection.commit()
             
@@ -875,70 +875,70 @@ async def clear_alloydb(confirmation: str = Query(..., description="确认字符
                 "timestamp": datetime.now().isoformat()
             }
     except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail=f"清空AlloyDB时出错: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear AlloyDB: {str(e)}")
 
 @router.get("/documents/{document_id}", 
            response_model=Dict[str, Any], 
-           summary="获取单个文档", 
-           description="根据ID获取单个文档的详细信息",
-           response_description="返回文档详情")
-async def get_document(document_id: int = Path(..., description="文档ID"), db: Session = Depends(get_db)):
+           summary="Get Single Document", 
+           description="Get detailed information about a single document based on ID",
+           response_description="Returns document details")
+async def get_document(document_id: int = Path(..., description="Document ID"), db: Session = Depends(get_db)):
     """
-    获取指定ID的文档
+    Get document by specified ID
     
-    根据文档ID获取单个文档的详细信息
+    Get detailed information about a single document based on document ID
     
-    参数:
-        document_id: 文档的唯一标识符
-        db: 数据库会话
+    Parameters:
+        document_id: Document's unique identifier
+        db: Database session
         
-    返回:
-        Dict: 包含文档详情的字典
+    Returns:
+        Dict: Dictionary containing document details
         
-    异常:
-        HTTPException: 如果文档不存在或获取失败
+    Exceptions:
+        HTTPException: If document does not exist or retrieval fails
     """
     try:
-        # 尝试获取文档，首先尝试id作为整数
+        # Try to get document, first try id as integer
         result = db.execute(
             text("SELECT id, title, doc_metadata, created_at FROM documents WHERE id::text = :id"),
             {"id": str(document_id)}
         ).fetchone()
         
         if not result:
-            # 如果没找到，可能需要尝试其他id格式
-            raise HTTPException(status_code=404, detail=f"未找到ID为{document_id}的文档")
+            # If not found, may need to try other id format
+            raise HTTPException(status_code=404, detail=f"No document found with ID {document_id}")
             
-        # 安全处理doc_metadata
+        # Safe handling doc_metadata
         try:
             metadata = result.doc_metadata
-            # 如果是字符串，尝试解析为JSON
+            # If it's a string, try to parse as JSON
             if isinstance(metadata, str):
                 try:
                     metadata = json.loads(metadata)
                 except json.JSONDecodeError as e:
-                    print(f"解析文档id={result.id}的元数据失败: {e}")
+                    print(f"Failed to parse document id={result.id} metadata: {e}")
                     metadata = {}
-            # 如果不是字典类型，使用空字典
+            # If not dictionary type, use empty dictionary
             elif not isinstance(metadata, dict):
-                print(f"文档id={result.id}的元数据不是有效的JSON或字典: {type(metadata)}")
+                print(f"Document id={result.id} metadata is not valid JSON or dictionary: {type(metadata)}")
                 metadata = {}
             
-            # 删除嵌入向量以减少响应大小
+            # Delete embedding vector to reduce response size
             if "_embedding" in metadata:
                 del metadata["_embedding"]
         except Exception as e:
-            print(f"处理文档id={result.id}的元数据时出错: {e}")
+            print(f"Failed to handle document id={result.id} metadata: {e}")
             metadata = {}
             
         return {
             "id": result.id,
             "title": result.title,
-            "content": result.title,  # 这里使用title作为content返回
+            "content": result.title,  # Use title as content return
             "metadata": metadata,
             "created_at": result.created_at.isoformat() if result.created_at else None
         }
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取文档失败: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to get document: {str(e)}") 

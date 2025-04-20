@@ -1,5 +1,5 @@
 """
-中间件模块 - 提供API请求日志记录与错误处理功能
+Middleware Module - Provides API request logging and error handling functionality
 """
 import time
 import uuid
@@ -8,7 +8,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 
-# 配置日志
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
@@ -22,108 +22,108 @@ logger = logging.getLogger("api")
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """
-    请求日志中间件 - 记录每个请求的处理时间和结果
+    Request Logging Middleware - Records processing time and results for each request
     """
     
     async def dispatch(self, request: Request, call_next):
-        # 生成请求ID
+        # Generate request ID
         request_id = str(uuid.uuid4())
         request.state.request_id = request_id
         
-        # 记录请求开始
+        # Log request start
         start_time = time.time()
         path = request.url.path
         method = request.method
         client = request.client.host if request.client else "unknown"
-        logger.info(f"请求开始 [{request_id}] {method} {path} 来自 {client}")
+        logger.info(f"Request started [{request_id}] {method} {path} from {client}")
         
-        # 处理请求
+        # Process request
         try:
             response = await call_next(request)
             
-            # 计算处理时间
+            # Calculate processing time
             process_time = time.time() - start_time
             logger.info(
-                f"请求完成 [{request_id}] {method} {path} "
-                f"状态码: {response.status_code} "
-                f"耗时: {process_time:.4f}秒"
+                f"Request completed [{request_id}] {method} {path} "
+                f"Status code: {response.status_code} "
+                f"Processing time: {process_time:.4f}s"
             )
             
-            # 添加请求ID和处理时间到响应头
+            # Add request ID and processing time to response headers
             response.headers["X-Request-ID"] = request_id
             response.headers["X-Process-Time"] = str(process_time)
             
             return response
             
         except Exception as e:
-            # 记录异常
+            # Log exception
             process_time = time.time() - start_time
             logger.error(
-                f"请求异常 [{request_id}] {method} {path} "
-                f"错误: {str(e)} "
-                f"耗时: {process_time:.4f}秒"
+                f"Request exception [{request_id}] {method} {path} "
+                f"Error: {str(e)} "
+                f"Processing time: {process_time:.4f}s"
             )
             
-            # 重新抛出异常，让FastAPI的异常处理器处理
+            # Re-raise exception for FastAPI's exception handler to handle
             raise
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
-    速率限制中间件 - 限制API请求频率
+    Rate Limit Middleware - Limits API request frequency
     """
     def __init__(self, app, rate_limit_per_minute=60):
         super().__init__(app)
         self.rate_limit = rate_limit_per_minute
         self.requests = {}  # {ip: [timestamp1, timestamp2, ...]}
-        self.window = 60  # 时间窗口（秒）
+        self.window = 60  # Time window (seconds)
     
     async def dispatch(self, request: Request, call_next):
-        # 获取客户端IP
+        # Get client IP
         client_ip = request.client.host if request.client else "unknown"
         
-        # 跳过健康检查端点
+        # Skip health check endpoints
         if request.url.path in ["/health", "/vector-status"]:
             return await call_next(request)
         
-        # 当前时间
+        # Current time
         now = time.time()
         
-        # 初始化客户端记录
+        # Initialize client record
         if client_ip not in self.requests:
             self.requests[client_ip] = []
         
-        # 清理过期的请求记录
+        # Clean expired request records
         self.requests[client_ip] = [t for t in self.requests[client_ip] if now - t < self.window]
         
-        # 检查是否超过速率限制
+        # Check if rate limit exceeded
         if len(self.requests[client_ip]) >= self.rate_limit:
-            logger.warning(f"速率限制 {client_ip} 超过每分钟 {self.rate_limit} 请求的限制")
+            logger.warning(f"Rate limit {client_ip} exceeded limit of {self.rate_limit} requests per minute")
             return Response(
-                content={"detail": "请求过于频繁，请稍后再试"},
+                content={"detail": "Too many requests, please try again later"},
                 status_code=429,
                 media_type="application/json"
             )
         
-        # 记录请求时间
+        # Record request time
         self.requests[client_ip].append(now)
         
-        # 处理请求
+        # Process request
         return await call_next(request)
 
 def setup_middleware(app):
     """
-    配置所有中间件
+    Configure all middleware
     """
-    # 请求日志中间件
+    # Request logging middleware
     app.add_middleware(RequestLoggingMiddleware)
     
-    # 速率限制中间件
+    # Rate limit middleware
     app.add_middleware(RateLimitMiddleware, rate_limit_per_minute=120)
     
-    # CORS中间件
+    # CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # 在生产环境中应指定允许的域名
+        allow_origins=["*"],  # In production environment, specify allowed domains
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

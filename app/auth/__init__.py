@@ -1,2 +1,2 @@
-# 移除了verify_credentials的导入和导出，因为认证逻辑已被移除
+# Removed the import and export of verify_credentials, as authentication logic has been removed
 __all__ = [] 

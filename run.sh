@@ -1,292 +1,292 @@
 #!/bin/bash
 
-# 定义颜色常量
+# Define color constants
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 BLUE='\033[0;34m'
-NC='\033[0m' # 无颜色
+NC='\033[0m' # No color
 
-# 定义文件路径和目录
+# Define file paths and directories
 PID_DIR="./pids"
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
 FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
 FRONTEND_DIR="./static/gemini-ui"
 LOG_DIR="./logs"
 
-# 创建日志子目录
+# Create log subdirectories
 BACKEND_LOG_DIR="$LOG_DIR/backend"
 FRONTEND_LOG_DIR="$LOG_DIR/frontend"
 mkdir -p $BACKEND_LOG_DIR
 mkdir -p $FRONTEND_LOG_DIR
 
-# 使用时间戳创建唯一的日志文件名
+# Create unique log filename using timestamp
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKEND_LOG="$BACKEND_LOG_DIR/backend_${TIMESTAMP}.log"
 FRONTEND_LOG="$FRONTEND_LOG_DIR/frontend_${TIMESTAMP}.log"
 BACKEND_CURRENT_LOG="$LOG_DIR/backend_current.log"
 FRONTEND_CURRENT_LOG="$LOG_DIR/frontend_current.log"
 
-# 创建必要的目录
+# Create necessary directories
 mkdir -p $PID_DIR
 mkdir -p $LOG_DIR
 mkdir -p $BACKEND_LOG_DIR
 mkdir -p $FRONTEND_LOG_DIR
 
-# 检查端口占用并清理进程
+# Check port usage and clean processes
 check_and_clean_port() {
     port=$1
     service_name=$2
 
-    echo -e "${YELLOW}检查端口 $port 是否被占用...${NC}"
+    echo -e "${YELLOW}Checking if port $port is in use...${NC}"
 
-    # 尝试使用lsof（大多数Linux/Unix系统支持）
+    # Try using lsof (supported by most Linux/Unix systems)
     if command -v lsof &> /dev/null; then
         pid=$(lsof -ti:$port)
         if [ ! -z "$pid" ]; then
-            echo -e "${RED}发现端口 $port 被进程 $pid 占用${NC}"
-            echo -e "${YELLOW}正在终止占用 $service_name 端口的进程...${NC}"
+            echo -e "${RED}Port $port is in use by process $pid${NC}"
+            echo -e "${YELLOW}Terminating process using $service_name port...${NC}"
             kill -9 $pid
             sleep 1
-            echo -e "${GREEN}端口 $port 已释放${NC}"
+            echo -e "${GREEN}Port $port has been released${NC}"
             return 0
         fi
-    # 如果lsof不可用，尝试使用netstat
+    # If lsof is not available, try using netstat
     elif command -v netstat &> /dev/null; then
         pid=$(netstat -tulpn 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d'/' -f1 | head -n1)
         if [ ! -z "$pid" ] && [ "$pid" != "-" ]; then
-            echo -e "${RED}发现端口 $port 被进程 $pid 占用${NC}"
-            echo -e "${YELLOW}正在终止占用 $service_name 端口的进程...${NC}"
+            echo -e "${RED}Port $port is in use by process $pid${NC}"
+            echo -e "${YELLOW}Terminating process using $service_name port...${NC}"
             kill -9 $pid
             sleep 1
-            echo -e "${GREEN}端口 $port 已释放${NC}"
+            echo -e "${GREEN}Port $port has been released${NC}"
             return 0
         fi
-    # 如果都不可用，提示用户手动检查
+    # If both are not available, prompt user to check manually
     else
-        echo -e "${YELLOW}无法检查端口占用情况，请确保端口 $port 未被占用${NC}"
+        echo -e "${YELLOW}Unable to check port usage, please ensure port $port is not in use${NC}"
     fi
 
-    echo -e "${GREEN}端口 $port 可用${NC}"
+    echo -e "${GREEN}Port $port is available${NC}"
 }
 
-# 显示帮助信息
+# Display help information
 show_help() {
-    echo -e "${BLUE}Gemini 向量搜索平台控制脚本${NC}"
+    echo -e "${BLUE}Gemini Vector Search Platform Control Script${NC}"
     echo ""
-    echo "用法: $0 [命令]"
+    echo "Usage: $0 [command]"
     echo ""
-    echo "命令:"
-    echo "  start         启动前后端服务"
-    echo "  start-frontend 仅启动前端服务"
-    echo "  start-backend 仅启动后端服务"
-    echo "  stop          停止前后端服务"
-    echo "  stop-frontend 仅停止前端服务"
-    echo "  stop-backend  仅停止后端服务"
-    echo "  restart       重启前后端服务"
-    echo "  restart-frontend 仅重启前端服务"
-    echo "  restart-backend  仅重启后端服务"
-    echo "  status        查看服务运行状态"
-    echo "  logs          查看当前日志"
-    echo "  help          显示此帮助信息"
+    echo "Commands:"
+    echo "  start         Start frontend and backend services"
+    echo "  start-frontend Start only the frontend service"
+    echo "  start-backend Start only the backend service"
+    echo "  stop          Stop frontend and backend services"
+    echo "  stop-frontend Stop only the frontend service"
+    echo "  stop-backend  Stop only the backend service"
+    echo "  restart       Restart frontend and backend services"
+    echo "  restart-frontend Restart only the frontend service"
+    echo "  restart-backend  Restart only the backend service"
+    echo "  status        Check service running status"
+    echo "  logs          View current logs"
+    echo "  help          Display this help information"
     echo ""
-    echo "示例:"
-    echo "  $0 start      启动所有服务"
-    echo "  $0 start-frontend 仅启动前端服务"
-    echo "  $0 start-backend  仅启动后端服务"
-    echo "  $0 stop       停止所有服务"
-    echo "  $0 logs       显示当前日志"
+    echo "Examples:"
+    echo "  $0 start      Start all services"
+    echo "  $0 start-frontend Start only the frontend service"
+    echo "  $0 start-backend  Start only the backend service"
+    echo "  $0 stop       Stop all services"
+    echo "  $0 logs       Show current logs"
 }
 
-# 检查服务状态
+# Check service status
 check_process() {
     pid=$1
     if ps -p $pid > /dev/null 2>&1; then
-        return 0  # 进程正在运行
+        return 0  # Process is running
     else
-        return 1  # 进程不存在
+        return 1  # Process does not exist
     fi
 }
 
-# 启动后端服务
+# Start backend service
 start_backend() {
-    echo -e "${YELLOW}正在启动后端服务...${NC}"
+    echo -e "${YELLOW}Starting backend service...${NC}"
 
-    # 检查端口占用
-    check_and_clean_port 8000 "后端"
+    # Check port usage
+    check_and_clean_port 8000 "backend"
 
-    # 检查是否已经运行
+    # Check if already running
     if [ -f $BACKEND_PID_FILE ]; then
         pid=$(cat $BACKEND_PID_FILE)
         if check_process $pid; then
-            echo -e "${RED}后端服务已经在运行中 (PID: $pid)${NC}"
+            echo -e "${RED}Backend service is already running (PID: $pid)${NC}"
             return 1
         else
-            # 如果PID文件存在但进程不存在，删除旧的PID文件
+            # If PID file exists but process doesn't, delete old PID file
             rm $BACKEND_PID_FILE
         fi
     fi
 
-    # 在日志文件开始添加启动时间信息
-    echo "===== 后端服务启动于 $(date) =====" > $BACKEND_LOG
+    # Add start time information at the beginning of the log file
+    echo "===== Backend service started at $(date) =====" > $BACKEND_LOG
     
-    # 启动后端服务
+    # Start backend service
     python main.py >> $BACKEND_LOG 2>&1 &
     backend_pid=$!
     echo $backend_pid > $BACKEND_PID_FILE
 
-    # 创建指向当前日志的符号链接
+    # Create symbolic link to current log
     rm -f $BACKEND_CURRENT_LOG
     ln -sf $BACKEND_LOG $BACKEND_CURRENT_LOG
     
-    # 记录日志文件路径到PID文件旁边，以便其他命令可以找到它
+    # Record log file path next to PID file, so other commands can find it
     echo $BACKEND_LOG > "${BACKEND_PID_FILE}.log"
 
-    # 等待一会儿确认进程仍在运行
+    # Wait a moment to confirm the process is still running
     sleep 2
     if check_process $backend_pid; then
-        echo -e "${GREEN}后端服务已启动 (PID: $backend_pid)${NC}"
-        echo -e "${GREEN}日志文件: $BACKEND_LOG${NC}"
-        echo -e "${GREEN}当前日志链接: $BACKEND_CURRENT_LOG${NC}"
+        echo -e "${GREEN}Backend service started (PID: $backend_pid)${NC}"
+        echo -e "${GREEN}Log file: $BACKEND_LOG${NC}"
+        echo -e "${GREEN}Current log link: $BACKEND_CURRENT_LOG${NC}"
         return 0
     else
-        echo -e "${RED}后端服务启动失败，请查看日志：$BACKEND_LOG${NC}"
+        echo -e "${RED}Backend service failed to start, please check the log: $BACKEND_LOG${NC}"
         return 1
     fi
 }
 
-# 启动前端服务
+# Start frontend service
 start_frontend() {
-    echo -e "${YELLOW}正在启动前端服务...${NC}"
+    echo -e "${YELLOW}Starting frontend service...${NC}"
 
-    # 检查端口占用
-    check_and_clean_port 5173 "前端"
+    # Check port usage
+    check_and_clean_port 5173 "frontend"
 
-    # 检查前端目录是否存在
+    # Check if frontend directory exists
     if [ ! -d "$FRONTEND_DIR" ]; then
-        echo -e "${RED}前端目录不存在: $FRONTEND_DIR${NC}"
+        echo -e "${RED}Frontend directory does not exist: $FRONTEND_DIR${NC}"
         return 1
     fi
 
-    # 检查是否已经运行
+    # Check if already running
     if [ -f $FRONTEND_PID_FILE ]; then
         pid=$(cat $FRONTEND_PID_FILE)
         if check_process $pid; then
-            echo -e "${RED}前端服务已经在运行中 (PID: $pid)${NC}"
+            echo -e "${RED}Frontend service is already running (PID: $pid)${NC}"
             return 1
         else
-            # 如果PID文件存在但进程不存在，删除旧的PID文件
+            # If PID file exists but process doesn't, delete old PID file
             rm $FRONTEND_PID_FILE
         fi
     fi
 
-    # 在日志文件开始添加启动时间信息
-    echo "===== 前端服务启动于 $(date) =====" > $FRONTEND_LOG
+    # Add start time information at the beginning of the log file
+    echo "===== Frontend service started at $(date) =====" > $FRONTEND_LOG
     
-    # 进入前端目录并启动服务
+    # Enter frontend directory and start service
     cd $FRONTEND_DIR
 
-    # 检查是否安装了依赖
+    # Check if dependencies are installed
     if [ ! -d "node_modules" ]; then
-        echo -e "${YELLOW}安装前端依赖...${NC}" | tee -a ../../$FRONTEND_LOG
+        echo -e "${YELLOW}Installing frontend dependencies...${NC}" | tee -a ../../$FRONTEND_LOG
         npm install >> ../../$FRONTEND_LOG 2>&1
     fi
 
-    # 启动前端服务
+    # Start frontend service
     npm start >> ../../$FRONTEND_LOG 2>&1 &
     frontend_pid=$!
     cd ../../
     echo $frontend_pid > $FRONTEND_PID_FILE
     
-    # 创建指向当前日志的符号链接
+    # Create symbolic link to current log
     rm -f $FRONTEND_CURRENT_LOG
     ln -sf $FRONTEND_LOG $FRONTEND_CURRENT_LOG
     
-    # 记录日志文件路径到PID文件旁边，以便其他命令可以找到它
+    # Record log file path next to PID file, so other commands can find it
     echo $FRONTEND_LOG > "${FRONTEND_PID_FILE}.log"
 
-    # 等待一会儿确认进程仍在运行
+    # Wait a moment to confirm the process is still running
     sleep 3
     if check_process $frontend_pid; then
-        echo -e "${GREEN}前端服务已启动 (PID: $frontend_pid)${NC}"
-        echo -e "${BLUE}前端访问地址: http://localhost:5173${NC}"
-        echo -e "${GREEN}日志文件: $FRONTEND_LOG${NC}"
-        echo -e "${GREEN}当前日志链接: $FRONTEND_CURRENT_LOG${NC}"
+        echo -e "${GREEN}Frontend service started (PID: $frontend_pid)${NC}"
+        echo -e "${BLUE}Frontend access address: http://localhost:5173${NC}"
+        echo -e "${GREEN}Log file: $FRONTEND_LOG${NC}"
+        echo -e "${GREEN}Current log link: $FRONTEND_CURRENT_LOG${NC}"
         return 0
     else
-        echo -e "${RED}前端服务启动失败，请查看日志：$FRONTEND_LOG${NC}"
+        echo -e "${RED}Frontend service failed to start, please check the log: $FRONTEND_LOG${NC}"
         return 1
     fi
 }
 
-# 停止服务
+# Stop service
 stop_service() {
     service_name=$1
     pid_file=$2
 
     if [ -f $pid_file ]; then
         pid=$(cat $pid_file)
-        echo -e "${YELLOW}正在停止${service_name}服务 (PID: $pid)...${NC}"
+        echo -e "${YELLOW}Stopping ${service_name} service (PID: $pid)...${NC}"
 
         if check_process $pid; then
             kill $pid
             sleep 2
 
-            # 检查是否成功停止
+            # Check if successfully stopped
             if check_process $pid; then
-                echo -e "${RED}${service_name}服务未能正常停止，尝试强制终止...${NC}"
+                echo -e "${RED}${service_name} service did not stop normally, trying to force terminate...${NC}"
                 kill -9 $pid
                 sleep 1
             fi
 
             if check_process $pid; then
-                echo -e "${RED}无法停止${service_name}服务，请手动终止进程 $pid${NC}"
+                echo -e "${RED}Unable to stop ${service_name} service, please manually terminate process $pid${NC}"
                 return 1
             else
-                echo -e "${GREEN}${service_name}服务已停止${NC}"
+                echo -e "${GREEN}${service_name} service stopped${NC}"
             fi
         else
-            echo -e "${YELLOW}${service_name}服务不在运行中${NC}"
+            echo -e "${YELLOW}${service_name} service is not running${NC}"
         fi
 
         rm $pid_file
-        # 删除日志文件路径记录但保留日志文件本身
+        # Delete log file path record but keep log file itself
         if [ -f "${pid_file}.log" ]; then
             rm "${pid_file}.log"
         fi
     else
-        echo -e "${YELLOW}${service_name}服务未运行${NC}"
+        echo -e "${YELLOW}${service_name} service is not running${NC}"
     fi
 
     return 0
 }
 
-# 显示日志
+# Display logs
 show_logs() {
-    # 检查后端日志
+    # Check backend log
     if [ -f $BACKEND_CURRENT_LOG ]; then
-        echo -e "${GREEN}=== 后端日志 (最新) ===${NC}"
+        echo -e "${GREEN}=== Backend log (latest) ===${NC}"
         tail -n 20 $BACKEND_CURRENT_LOG
-        echo -e "${GREEN}查看完整日志: less $BACKEND_CURRENT_LOG${NC}"
+        echo -e "${GREEN}View full log: less $BACKEND_CURRENT_LOG${NC}"
     else
-        echo -e "${YELLOW}后端日志不存在${NC}"
+        echo -e "${YELLOW}Backend log does not exist${NC}"
     fi
     
     echo ""
     
-    # 检查前端日志
+    # Check frontend log
     if [ -f $FRONTEND_CURRENT_LOG ]; then
-        echo -e "${GREEN}=== 前端日志 (最新) ===${NC}"
+        echo -e "${GREEN}=== Frontend log (latest) ===${NC}"
         tail -n 20 $FRONTEND_CURRENT_LOG
-        echo -e "${GREEN}查看完整日志: less $FRONTEND_CURRENT_LOG${NC}"
+        echo -e "${GREEN}View full log: less $FRONTEND_CURRENT_LOG${NC}"
     else
-        echo -e "${YELLOW}前端日志不存在${NC}"
+        echo -e "${YELLOW}Frontend log does not exist${NC}"
     fi
 }
 
-# 启动所有服务
+# Start all services
 start_all() {
-    echo -e "${BLUE}=== 启动所有服务 ===${NC}"
+    echo -e "${BLUE}=== Starting all services ===${NC}"
     start_backend
     backend_status=$?
     start_frontend
@@ -294,92 +294,92 @@ start_all() {
 
     echo ""
     if [ $backend_status -eq 0 ] && [ $frontend_status -eq 0 ]; then
-        echo -e "${GREEN}所有服务已成功启动${NC}"
+        echo -e "${GREEN}All services started successfully${NC}"
         return 0
     else
-        echo -e "${RED}一个或多个服务启动失败${NC}"
+        echo -e "${RED}One or more services failed to start${NC}"
         return 1
     fi
 }
 
-# 停止所有服务
+# Stop all services
 stop_all() {
-    echo -e "${BLUE}=== 停止所有服务 ===${NC}"
-    echo -e "${YELLOW}优先停止前端服务...${NC}"
-    stop_service "前端" $FRONTEND_PID_FILE
+    echo -e "${BLUE}=== Stopping all services ===${NC}"
+    echo -e "${YELLOW}Stopping frontend service first...${NC}"
+    stop_service "frontend" $FRONTEND_PID_FILE
 
-    echo -e "${YELLOW}然后停止后端服务...${NC}"
-    stop_service "后端" $BACKEND_PID_FILE
+    echo -e "${YELLOW}Then stopping backend service...${NC}"
+    stop_service "backend" $BACKEND_PID_FILE
 
     echo ""
-    echo -e "${GREEN}所有服务已停止${NC}"
+    echo -e "${GREEN}All services stopped${NC}"
 }
 
-# 重启所有服务
+# Restart all services
 restart_all() {
-    echo -e "${BLUE}=== 重启所有服务 ===${NC}"
+    echo -e "${BLUE}=== Restarting all services ===${NC}"
     stop_all
     echo ""
     start_all
 }
 
-# 重启前端服务
+# Restart frontend service
 restart_frontend() {
-    echo -e "${BLUE}=== 重启前端服务 ===${NC}"
-    stop_service "前端" $FRONTEND_PID_FILE
+    echo -e "${BLUE}=== Restarting frontend service ===${NC}"
+    stop_service "frontend" $FRONTEND_PID_FILE
     echo ""
     start_frontend
 }
 
-# 重启后端服务
+# Restart backend service
 restart_backend() {
-    echo -e "${BLUE}=== 重启后端服务 ===${NC}"
-    stop_service "后端" $BACKEND_PID_FILE
+    echo -e "${BLUE}=== Restarting backend service ===${NC}"
+    stop_service "backend" $BACKEND_PID_FILE
     echo ""
     start_backend
 }
 
-# 显示服务状态
+# Show service status
 show_status() {
-    echo -e "${BLUE}=== 服务状态 ===${NC}"
+    echo -e "${BLUE}=== Service status ===${NC}"
 
-    # 检查后端状态
+    # Check backend status
     if [ -f $BACKEND_PID_FILE ]; then
         backend_pid=$(cat $BACKEND_PID_FILE)
         if check_process $backend_pid; then
-            echo -e "${GREEN}后端服务: 运行中 (PID: $backend_pid)${NC}"
-            # 如果有日志文件记录，显示日志路径
+            echo -e "${GREEN}Backend service: running (PID: $backend_pid)${NC}"
+            # If there is a log file record, display log path
             if [ -f "${BACKEND_PID_FILE}.log" ]; then
                 backend_log=$(cat "${BACKEND_PID_FILE}.log")
-                echo -e "${GREEN}后端日志: $backend_log${NC}"
+                echo -e "${GREEN}Backend log: $backend_log${NC}"
             fi
         else
-            echo -e "${RED}后端服务: 进程不存在，但PID文件存在${NC}"
+            echo -e "${RED}Backend service: process does not exist, but PID file exists${NC}"
         fi
     else
-        echo -e "${YELLOW}后端服务: 未运行${NC}"
+        echo -e "${YELLOW}Backend service: not running${NC}"
     fi
 
-    # 检查前端状态
+    # Check frontend status
     if [ -f $FRONTEND_PID_FILE ]; then
         frontend_pid=$(cat $FRONTEND_PID_FILE)
         if check_process $frontend_pid; then
-            echo -e "${GREEN}前端服务: 运行中 (PID: $frontend_pid)${NC}"
-            echo -e "${BLUE}前端访问地址: http://localhost:5173${NC}"
-            # 如果有日志文件记录，显示日志路径
+            echo -e "${GREEN}Frontend service: running (PID: $frontend_pid)${NC}"
+            echo -e "${BLUE}Frontend access address: http://localhost:5173${NC}"
+            # If there is a log file record, display log path
             if [ -f "${FRONTEND_PID_FILE}.log" ]; then
                 frontend_log=$(cat "${FRONTEND_PID_FILE}.log")
-                echo -e "${GREEN}前端日志: $frontend_log${NC}"
+                echo -e "${GREEN}Frontend log: $frontend_log${NC}"
             fi
         else
-            echo -e "${RED}前端服务: 进程不存在，但PID文件存在${NC}"
+            echo -e "${RED}Frontend service: process does not exist, but PID file exists${NC}"
         fi
     else
-        echo -e "${YELLOW}前端服务: 未运行${NC}"
+        echo -e "${YELLOW}Frontend service: not running${NC}"
     fi
 }
 
-# 主逻辑
+# Main logic
 case "$1" in
     start)
         start_all
@@ -394,10 +394,10 @@ case "$1" in
         stop_all
         ;;
     stop-frontend)
-        stop_service "前端" $FRONTEND_PID_FILE
+        stop_service "frontend" $FRONTEND_PID_FILE
         ;;
     stop-backend)
-        stop_service "后端" $BACKEND_PID_FILE
+        stop_service "backend" $BACKEND_PID_FILE
         ;;
     restart)
         restart_all
