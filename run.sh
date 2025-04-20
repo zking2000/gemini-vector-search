@@ -135,12 +135,13 @@ start_backend() {
     backend_pid=$!
     echo $backend_pid > $BACKEND_PID_FILE
 
-    # Create symbolic link to current log
+    # Create symbolic link to current log - use absolute path for reliability
+    BACKEND_LOG_ABSOLUTE=$(realpath $BACKEND_LOG)
     rm -f $BACKEND_CURRENT_LOG
-    ln -sf $BACKEND_LOG $BACKEND_CURRENT_LOG
+    ln -sf $BACKEND_LOG_ABSOLUTE $BACKEND_CURRENT_LOG
     
     # Record log file path next to PID file, so other commands can find it
-    echo $BACKEND_LOG > "${BACKEND_PID_FILE}.log"
+    echo $BACKEND_LOG_ABSOLUTE > "${BACKEND_PID_FILE}.log"
 
     # Wait a moment to confirm the process is still running
     sleep 2
@@ -192,18 +193,21 @@ start_frontend() {
         npm install >> ../../$FRONTEND_LOG 2>&1
     fi
 
+    # Get absolute path for frontend log
+    FRONTEND_LOG_ABSOLUTE=$(realpath ../../$FRONTEND_LOG)
+
     # Start frontend service
     npm start >> ../../$FRONTEND_LOG 2>&1 &
     frontend_pid=$!
     cd ../../
     echo $frontend_pid > $FRONTEND_PID_FILE
     
-    # Create symbolic link to current log
+    # Create symbolic link to current log - use absolute path for reliability
     rm -f $FRONTEND_CURRENT_LOG
-    ln -sf $FRONTEND_LOG $FRONTEND_CURRENT_LOG
+    ln -sf $FRONTEND_LOG_ABSOLUTE $FRONTEND_CURRENT_LOG
     
     # Record log file path next to PID file, so other commands can find it
-    echo $FRONTEND_LOG > "${FRONTEND_PID_FILE}.log"
+    echo $FRONTEND_LOG_ABSOLUTE > "${FRONTEND_PID_FILE}.log"
 
     # Wait a moment to confirm the process is still running
     sleep 3
@@ -264,23 +268,51 @@ stop_service() {
 # Display logs
 show_logs() {
     # Check backend log
-    if [ -f $BACKEND_CURRENT_LOG ]; then
+    if [ -f $BACKEND_CURRENT_LOG ] && [ -r $BACKEND_CURRENT_LOG ]; then
         echo -e "${GREEN}=== Backend log (latest) ===${NC}"
         tail -n 20 $BACKEND_CURRENT_LOG
         echo -e "${GREEN}View full log: less $BACKEND_CURRENT_LOG${NC}"
     else
-        echo -e "${YELLOW}Backend log does not exist${NC}"
+        # Try to find the latest backend log
+        LATEST_BACKEND_LOG=$(ls -t $BACKEND_LOG_DIR/backend_*.log 2>/dev/null | head -1)
+        if [ ! -z "$LATEST_BACKEND_LOG" ] && [ -f "$LATEST_BACKEND_LOG" ]; then
+            echo -e "${GREEN}=== Backend log (latest from $BACKEND_LOG_DIR) ===${NC}"
+            tail -n 20 "$LATEST_BACKEND_LOG"
+            echo -e "${GREEN}View full log: less $LATEST_BACKEND_LOG${NC}"
+            
+            # Attempt to fix the symbolic link
+            echo -e "${YELLOW}Fixing backend log symbolic link...${NC}"
+            rm -f $BACKEND_CURRENT_LOG
+            ln -sf "$LATEST_BACKEND_LOG" $BACKEND_CURRENT_LOG
+            echo -e "${GREEN}Symbolic link fixed. Next time you can use './run.sh logs' normally.${NC}"
+        else
+            echo -e "${YELLOW}Backend log does not exist or cannot be found${NC}"
+        fi
     fi
     
     echo ""
     
     # Check frontend log
-    if [ -f $FRONTEND_CURRENT_LOG ]; then
+    if [ -f $FRONTEND_CURRENT_LOG ] && [ -r $FRONTEND_CURRENT_LOG ]; then
         echo -e "${GREEN}=== Frontend log (latest) ===${NC}"
         tail -n 20 $FRONTEND_CURRENT_LOG
         echo -e "${GREEN}View full log: less $FRONTEND_CURRENT_LOG${NC}"
     else
-        echo -e "${YELLOW}Frontend log does not exist${NC}"
+        # Try to find the latest frontend log
+        LATEST_FRONTEND_LOG=$(ls -t $FRONTEND_LOG_DIR/frontend_*.log 2>/dev/null | head -1)
+        if [ ! -z "$LATEST_FRONTEND_LOG" ] && [ -f "$LATEST_FRONTEND_LOG" ]; then
+            echo -e "${GREEN}=== Frontend log (latest from $FRONTEND_LOG_DIR) ===${NC}"
+            tail -n 20 "$LATEST_FRONTEND_LOG"
+            echo -e "${GREEN}View full log: less $LATEST_FRONTEND_LOG${NC}"
+            
+            # Attempt to fix the symbolic link
+            echo -e "${YELLOW}Fixing frontend log symbolic link...${NC}"
+            rm -f $FRONTEND_CURRENT_LOG
+            ln -sf "$LATEST_FRONTEND_LOG" $FRONTEND_CURRENT_LOG
+            echo -e "${GREEN}Symbolic link fixed. Next time you can use './run.sh logs' normally.${NC}"
+        else
+            echo -e "${YELLOW}Frontend log does not exist or cannot be found${NC}"
+        fi
     fi
 }
 
