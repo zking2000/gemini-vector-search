@@ -43,12 +43,16 @@ class CompletionRequest(BaseModel):
     """
     Text Completion Request Model
     """
+    model_config = {"protected_namespaces": ()}
+    
     prompt: str = Field(..., description="Text prompt to be completed", 
                        example="Please explain what a vector database is and its main advantages")
     use_context: bool = Field(False, description="Whether to use context documents to assist generation")
     context_query: Optional[str] = Field(None, description="Query text for retrieving context, only effective when use_context is true",
                                         example="vector database advantages features")
     max_context_docs: int = Field(5, description="Maximum number of context documents, recommended between 1-10", ge=1, le=20)
+    disable_cache: bool = Field(False, description="Whether to disable caching for this request")
+    model_complexity: Optional[str] = Field(None, description="Preferred model complexity level: 'simple', 'normal', or 'complex'. Defaults to auto-detection.")
 
 class CompletionResponse(BaseModel):
     """

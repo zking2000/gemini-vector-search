@@ -76,15 +76,29 @@
             "type": "boolean",
             "description": "Whether to use document chunks for search",
             "default": true
+          },
+          "disable_cache": {
+            "type": "boolean",
+            "description": "Whether to disable caching for this request",
+            "default": false
+          },
+          "model_complexity": {
+            "type": "string",
+            "description": "Preferred model complexity level: 'simple', 'normal', or 'complex'. Affects which Gemini model is used and thinking budget.",
+            "enum": ["simple", "normal", "complex"]
           }
         }
       },
       "CompletionResponse": {
         "type": "object",
         "properties": {
-          "response": {
+          "completion": {
             "type": "string",
-            "description": "Generated response"
+            "description": "Generated completion text from Gemini model"
+          },
+          "debug_info": {
+            "type": "object",
+            "description": "Debug information, only returned when debug=true is set in the request"
           }
         }
       },
@@ -254,6 +268,16 @@
             "type": "boolean",
             "description": "Whether to use document chunks for search",
             "default": true
+          },
+          "model_complexity": {
+            "type": "string",
+            "description": "Preferred model complexity level: 'simple', 'normal', or 'complex'. Affects which Gemini model is used and thinking budget.",
+            "enum": ["simple", "normal", "complex"]
+          },
+          "disable_cache": {
+            "type": "boolean",
+            "description": "Whether to disable caching for this request",
+            "default": false
           }
         }
       },

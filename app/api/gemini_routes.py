@@ -146,8 +146,24 @@ async def create_completion(
             if similar_docs:
                 context = await gemini_service.prepare_context(request.context_query, similar_docs)
         
-        # Generate completion
-        completion = await gemini_service.generate_completion(request.prompt, context)
+        # Determine task complexity based on prompt length and content
+        complexity = "normal"
+        if request.model_complexity in ["simple", "normal", "complex"]:
+            # Use user-specified complexity if provided
+            complexity = request.model_complexity
+        elif len(request.prompt) > 1000 or "详细" in request.prompt or "complex" in request.prompt.lower():
+            complexity = "complex"
+        elif len(request.prompt) < 100 and not any(term in request.prompt.lower() for term in ["explain", "analyze", "compare", "evaluate"]):
+            complexity = "simple"
+        
+        # Generate completion with complexity hint
+        completion = await gemini_service.generate_completion(
+            prompt=request.prompt, 
+            context=context,
+            complexity=complexity,
+            use_cache=not request.disable_cache
+        )
+        
         return {"completion": completion}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Completion generation failed: {str(e)}")

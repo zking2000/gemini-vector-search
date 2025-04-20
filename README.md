@@ -423,6 +423,38 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ./run.sh logs
 ```
 
+## Advanced Gemini API Features
+
+The system now supports several advanced Gemini API features:
+
+### Model Selection and Thinking Budget
+
+- **Gemini 2.5 Flash Preview** - Latest model with enhanced capabilities, used for complex queries
+- **Gemini 2.0 Flash** - Balanced model for general purpose tasks
+- **Thinking Budget Control** - Allows fine-tuned control over how much "thinking" the model performs:
+  - `simple` complexity: No thinking (budget=0), fastest response
+  - `normal` complexity: Moderate thinking (budget=1024), balanced
+  - `complex` complexity: Deep thinking (budget=8192), most comprehensive
+
+### Task Complexity Detection
+
+The system automatically detects the complexity level of user queries:
+- **Simple Tasks** - Short prompts (<100 tokens) without analytical keywords
+- **Normal Tasks** - Default complexity level for most queries
+- **Complex Tasks** - Long prompts (>1000 tokens) or queries containing keywords like "详细" or "complex"
+
+### Response Caching
+
+- **Performance Optimization** - Caches responses to identical prompts to reduce API calls
+- **Cache Control** - The `disable_cache` parameter allows bypassing cache when needed
+- **Memory Efficiency** - Cache invalidation based on MD5 hash of the request parameters
+
+### API Request Parameters
+
+New parameters available for completion requests:
+- `model_complexity`: Control which model and thinking budget to use ("simple", "normal", "complex")
+- `disable_cache`: Bypass response caching (default: false)
+
 ### Command Line Options
 
 | Option | Description | Default Value |

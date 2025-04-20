@@ -17,6 +17,9 @@ from app.db.init_db import init_db
 from sqlalchemy import text
 from app.core.middleware import setup_middleware
 import logging
+from contextlib import asynccontextmanager
+import google.generativeai as genai
+from app.services.gemini_service import GeminiService
 
 # Configure logging
 logging.basicConfig(
@@ -39,6 +42,44 @@ try:
 except Exception as e:
     logger.error(f"Error initializing database: {e}")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
+    # Startup code
+    logger.info("Application started")
+    
+    # Print Gemini model information
+    try:
+        # 获取Gemini服务实例
+        gemini_service = GeminiService()
+        
+        # 打印模型版本信息
+        logger.info(f"Using Gemini model: {gemini_service.model_id}")
+        logger.info(f"Embedding model: {gemini_service.embedding_model_name}")
+        
+        # 获取可用模型列表
+        try:
+            models = genai.list_models()
+            gemini_models = [model.name for model in models if "gemini" in model.name.lower()]
+            logger.info(f"Available Gemini models: {', '.join(gemini_models)}")
+        except Exception as e:
+            logger.warning(f"Could not retrieve available models list: {e}")
+        
+        # 打印API凭证信息（不包含敏感数据）
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "Not set")
+        api_configured = "Yes" if os.getenv("GOOGLE_API_KEY") else "No"
+        logger.info(f"Google Cloud Project: {project_id}")
+        logger.info(f"API Key configured: {api_configured}")
+        
+        # 打印高级功能支持
+        logger.info(f"Advanced features: Thinking Budget, Model Complexity Selection, Response Caching")
+    except Exception as e:
+        logger.error(f"Error printing Gemini model information: {e}")
+    
+    yield
+    # Shutdown code
+    logger.info("Application shutdown")
+
 # Create FastAPI application
 app = FastAPI(
     title="Gemini Vector Search API",
@@ -56,7 +97,8 @@ app = FastAPI(
     version="1.0.0",
     docs_url=None,  # Disable default docs path, we'll create a custom one
     redoc_url="/redoc",
-    openapi_url="/api/openapi.json"
+    openapi_url="/api/openapi.json",
+    lifespan=lifespan
 )
 
 # Set up middleware
@@ -90,12 +132,13 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # Custom OpenAPI documentation path, enhancing Swagger UI experience
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html():
+    favicon_path = "/api-guide/favicon.png"  # 使用挂载的静态目录
     return get_swagger_ui_html(
         openapi_url="/api/openapi.json",
         title="Gemini Vector Search API - Interactive Documentation",
         swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
         swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
-        swagger_favicon_url="/static/favicon.png",
+        swagger_favicon_url=favicon_path,
         oauth2_redirect_url=None,
         init_oauth=None,
     )
@@ -185,7 +228,14 @@ async def vector_status():
 
 # Provide static files for API guide
 try:
-    app.mount("/api-guide", StaticFiles(directory="static", html=True), name="api_guide")
+    static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static'))
+    logger.info(f"Attempting to mount static directory: {static_dir}")
+    if os.path.exists(static_dir) and os.path.isdir(static_dir):
+        app.mount("/api-guide", StaticFiles(directory=static_dir, html=True), name="api_guide")
+        logger.info(f"Successfully mounted static directory: {static_dir}")
+    else:
+        logger.error(f"Static directory does not exist or is not a directory: {static_dir}")
+        raise FileNotFoundError(f"Static directory not found: {static_dir}")
 except Exception as e:
     logger.error(f"Unable to mount static files directory: {e}")
     # Create a temporary route as an alternative
@@ -196,18 +246,6 @@ except Exception as e:
 
 # Add document browser page route
 # This feature has been removed
-
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Code executed at application startup"""
-    logger.info("Application started")
-
-# Shutdown event
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Code executed at application shutdown"""
-    logger.info("Application shutdown")
 
 # If this file is run directly
 if __name__ == "__main__":

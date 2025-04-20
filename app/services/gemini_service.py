@@ -47,10 +47,12 @@ If the question is about the founder of Buddhism, pay special attention to conte
     }
     
     def __init__(self):
-        self.model_id = "gemini-2.0-flash"
+        self.model_id = "gemini-2.5-pro-exp-03-25"
         self.embedding_model_name = "models/gemini-embedding-exp-03-07"  # Updated to correct model name format
         # Add simple embedding cache to avoid repeated calculations
         self.embedding_cache = {}
+        # Add completion cache
+        self._completion_cache = {}
         
     async def generate_embedding(self, text: str) -> List[float]:
         """Generate embedding vector for text"""
@@ -168,15 +170,104 @@ If the question is about the founder of Buddhism, pay special attention to conte
                 
         return results
         
-    async def generate_completion(self, prompt: str, context: Optional[str] = None) -> str:
-        """Generate text completion using Gemini"""
-        model = genai.GenerativeModel(self.model_id)
+    async def generate_completion(self, prompt: str, context: Optional[str] = None, complexity: str = "normal", use_cache: bool = True) -> str:
+        """Generate text completion using Gemini with optimized settings
         
-        if context:
-            prompt = f"{context}\n\n{prompt}"
+        Args:
+            prompt: The prompt text
+            context: Optional context to prepend to the prompt
+            complexity: Task complexity level ('simple', 'normal', 'complex')
+            use_cache: Whether to use cache for the completion
             
-        response = model.generate_content(prompt)
-        return response.text
+        Returns:
+            Generated text completion
+        """
+        # Prepare full prompt with context
+        full_prompt = f"{context}\n\n{prompt}" if context else prompt
+        
+        # Use cache if enabled
+        if use_cache:
+            import hashlib
+            cache_key = hashlib.md5((full_prompt + complexity).encode()).hexdigest()
+            if cache_key in self._completion_cache:
+                print(f"Using cached completion for prompt: {prompt[:50]}...")
+                return self._completion_cache[cache_key]
+        
+        # Select model based on task complexity
+        model_name = self.model_id
+        use_thinking_budget = False
+        
+        # Use more advanced models for complex tasks if available
+        if complexity == "complex" and "2.0" in self.model_id:
+            try:
+                # Try to use Gemini 2.5 for complex tasks if available
+                model_name = "gemini-2.5-flash-preview-04-17"
+                use_thinking_budget = True
+            except Exception:
+                model_name = self.model_id
+        
+        # Initialize model
+        model = genai.GenerativeModel(model_name)
+        
+        # Set generation configuration
+        generation_config = {}
+        
+        # Apply thinking budget for supported models
+        if use_thinking_budget:
+            thinking_budget = 0
+            if complexity == "simple":
+                thinking_budget = 0  # No thinking for simple tasks
+            elif complexity == "normal":
+                thinking_budget = 1024  # Moderate thinking for normal tasks
+            elif complexity == "complex":
+                thinking_budget = 8192  # Deep thinking for complex tasks
+            
+            generation_config = {
+                "thinking_config": {"thinking_budget": thinking_budget}
+            }
+        
+        # Generate response with error handling
+        try:
+            # Apply generation config if provided
+            if generation_config:
+                response = model.generate_content(full_prompt, generation_config=generation_config)
+            else:
+                response = model.generate_content(full_prompt)
+            
+            result = response.text
+            
+            # Cache the result if caching is enabled
+            if use_cache:
+                if not hasattr(self, '_completion_cache'):
+                    self._completion_cache = {}
+                self._completion_cache[cache_key] = result
+                
+            return result
+            
+        except Exception as e:
+            print(f"Error generating completion with {model_name}: {e}")
+            
+            # Fallback to basic model if advanced model fails
+            if model_name != self.model_id:
+                print(f"Falling back to default model {self.model_id}")
+                try:
+                    fallback_model = genai.GenerativeModel(self.model_id)
+                    fallback_response = fallback_model.generate_content(full_prompt)
+                    return fallback_response.text
+                except Exception as fallback_error:
+                    print(f"Fallback also failed: {fallback_error}")
+            
+            # If all fails, return error message or empty string
+            return f"Error generating completion: {str(e)}"
+        
+        # All model calls have failed, try a fallback approach or return error message
+        fallback_text = "I'm sorry, but I couldn't generate a response at this time. Please try again later."
+        
+        if use_cache:
+            # Cache the completion result
+            self._completion_cache[cache_key] = fallback_text
+            
+        return fallback_text
         
     def _identify_topic(self, query: str) -> Tuple[bool, Optional[str], Optional[str]]:
         """Identify query topic and return relevant guidance

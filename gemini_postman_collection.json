@@ -311,7 +311,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"prompt\": \"What is vector database?\",\n  \"use_context\": true,\n  \"context_query\": \"vector database\",\n  \"max_context_docs\": 5,\n  \"temperature\": 0.7,\n  \"use_chunks\": true\n}"
+              "raw": "{\n  \"prompt\": \"What is vector database?\",\n  \"use_context\": true,\n  \"context_query\": \"vector database\",\n  \"max_context_docs\": 5,\n  \"temperature\": 0.7,\n  \"use_chunks\": true,\n  \"disable_cache\": false,\n  \"model_complexity\": \"normal\"\n}"
             },
             "url": {
               "raw": "http://35.246.2.155:8000/api/v1/completion",
@@ -320,7 +320,7 @@
               "port": "8000",
               "path": ["api", "v1", "completion"]
             },
-            "description": "Use Gemini model to generate text completion"
+            "description": "Use Gemini model to generate text completion, supports model complexity control and response caching"
           },
           "response": []
         }
@@ -367,7 +367,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"prompt\": \"What was the total return of the Government Pension Fund Global in 2023, and how did it compare to the benchmark index?\",\n  \"context_query\": \"\",\n  \"max_context_docs\": 8,\n  \"source_filter\": \"\",\n  \"debug\": true,\n  \"use_chunks\": true\n}"
+              "raw": "{\n  \"prompt\": \"What was the total return of the Government Pension Fund Global in 2023, and how did it compare to the benchmark index?\",\n  \"context_query\": \"\",\n  \"max_context_docs\": 8,\n  \"source_filter\": \"\",\n  \"debug\": true,\n  \"use_chunks\": true,\n  \"model_complexity\": \"complex\",\n  \"disable_cache\": false\n}"
             },
             "url": {
               "raw": "http://35.246.2.155:8000/api/v1/integration?source_filter=&debug=true&force_use_documents=false",
