@@ -307,19 +307,27 @@ async def integration_query(
         if context:
             if is_chinese_query:
                 completion_prompt = f"""
-You are a knowledgeable assistant, especially skilled at answering questions about Chinese history and culture.
-Please answer the user's question based on the following reference material. If the reference material does not contain relevant information, please clearly indicate which information is missing.
+You are a knowledgeable assistant tasked with answering questions based ONLY on the provided reference material.
+
+IMPORTANT INSTRUCTIONS:
+1. You are given English documents but the user is asking in Chinese.
+2. You must answer in Chinese.
+3. You must ONLY use information found in the reference material.
+4. Do NOT use your general knowledge unless absolutely necessary to explain concepts in the documents.
+5. If the reference material does not contain the answer, clearly state this in Chinese.
+6. Translate relevant information from the English documents into Chinese to answer the query.
+7. When referencing specific points from the documents, mention which document they came from.
 
 Reference material:
 {context}
 
-User question: {request.prompt}
+User question (in Chinese): {request.prompt}
 
-Please answer in Chinese and try to explain related concepts in detail. If the reference material is insufficient, please indicate that your answer is based on general knowledge rather than system documents.
+Provide a comprehensive answer in Chinese, based strictly on the information in the reference material.
 """
             else:
                 completion_prompt = f"""
-You are a knowledgeable assistant, especially skilled at answering questions about history and culture.
+You are a knowledgeable assistant, especially skilled at answering questions using ONLY the information in the provided reference material.
 Please answer the user's question based on the following reference material. If the reference material does not contain relevant information, please clearly indicate which information is missing.
 
 Reference material:
@@ -361,22 +369,21 @@ User question: {request.prompt}
                         
                         if is_chinese_query:
                             completion_prompt = f"""
-You are a knowledgeable assistant, especially skilled at answering questions about Chinese history and culture.
+非常抱歉，我在系统中搜索了所有文档（共 {doc_count} 个），但未能找到与您的问题"{request.prompt}"直接相关的内容。
 
-I searched through all documents in the database (total {doc_count}) but couldn't find any directly relevant to "{request.prompt}".
-Here are some sample documents in the system:
+以下是系统中的一些文档示例：
 {doc_list}
 
-Since you've selected the force_use_documents mode, I must base my answer on documents in the system. However, the system may not contain information related to this question.
+由于您选择了强制使用文档内容模式，我必须基于系统中的文档回答问题，但系统中可能没有与此问题相关的信息。
 
-Please compare your question with the documents in the system and consider:
-1. Whether you need to upload documents containing the relevant information
-2. Whether you need to adjust your query wording to better match existing documents
-3. Whether you need to expand the document library to cover this topic
+请考虑以下几点：
+1. 是否需要上传包含相关信息的文档
+2. 是否需要调整查询措辞以更好地匹配现有文档
+3. 是否需要扩展文档库以涵盖这个主题
 
-User question: {request.prompt}
+您的问题是：{request.prompt}
 
-Please clearly indicate that the system may be missing relevant documents.
+我必须声明，系统中可能缺少相关文档。
 """
                         else:
                             completion_prompt = f"""
@@ -404,17 +411,16 @@ Please clearly indicate that the system may be missing relevant documents.
             if not force_use_documents:
                 if is_chinese_query:
                     completion_prompt = f"""
-You are a knowledgeable assistant, especially skilled at answering questions about Chinese history and culture.
-I couldn't find any reference material related to "{request.prompt}". Please answer based on your knowledge, but please clearly indicate that your answer is not based on system document content.
+非常抱歉，我在系统中没有找到与"{request.prompt}"相关的参考资料。
 
-Possible reasons include:
-1. There may be no documents related to this topic in the database
-2. The query wording does not match the document content
-3. The vector representation of the related documents is not similar enough to the query vector representation
+可能的原因包括：
+1. 数据库中可能没有与此主题相关的文档
+2. 查询措辞与文档内容不匹配
+3. 相关文档的向量表示与查询向量表示的相似度不够高
 
-User question: {request.prompt}
+您的问题是：{request.prompt}
 
-Please answer in Chinese and try to explain related concepts in detail. At the same time, please clearly indicate that your answer is based on general knowledge rather than system documents.
+请注意，以下回答基于通用知识而非系统中的文档内容。
 """
                 else:
                     completion_prompt = f"""

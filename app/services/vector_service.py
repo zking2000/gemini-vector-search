@@ -11,8 +11,104 @@ from app.services.cache_service import cached
 class VectorService:
     """Vector database service"""
     
+    # Chinese to English keyword mapping for common terms
+    # This helps bridging the gap between Chinese queries and English documents
+    ZH_EN_KEYWORD_MAP = {
+        # General
+        "历史": ["history", "historical", "timeline", "chronicles"],
+        "经济": ["economy", "economic", "finance", "financial", "market"],
+        "政治": ["politics", "political", "government", "governance", "policy"],
+        "社会": ["society", "social", "community", "public"],
+        "文化": ["culture", "cultural", "heritage", "tradition"],
+        "科学": ["science", "scientific", "research", "study"],
+        "技术": ["technology", "technical", "engineering", "innovation"],
+        "艺术": ["art", "artistic", "design", "creative"],
+        "教育": ["education", "educational", "learning", "teaching", "academic"],
+        "医学": ["medicine", "medical", "healthcare", "health", "clinical"],
+        
+        # Common topics
+        "人工智能": ["artificial intelligence", "AI", "machine learning", "deep learning"],
+        "气候变化": ["climate change", "global warming", "environmental", "sustainability"],
+        "大数据": ["big data", "data analytics", "data science"],
+        "区块链": ["blockchain", "cryptocurrency", "bitcoin", "distributed ledger"],
+        "云计算": ["cloud computing", "cloud service", "cloud platform"],
+        
+        # Add more mappings as needed
+    }
+    
     def __init__(self):
         self.gemini_service = GeminiService()
+    
+    def _expand_chinese_query(self, query: str) -> str:
+        """
+        Expand Chinese query with English equivalent terms to improve matching with English documents
+        
+        Args:
+            query: Original Chinese query
+            
+        Returns:
+            Expanded query with added English terms
+        """
+        expanded_terms = []
+        
+        # Check for each Chinese keyword in the query
+        for zh_term, en_terms in self.ZH_EN_KEYWORD_MAP.items():
+            if zh_term in query:
+                # Add the first two English equivalent terms to avoid too much noise
+                expanded_terms.extend(en_terms[:2])
+        
+        # If no terms were expanded but the query contains Chinese characters
+        if not expanded_terms and any('\u4e00' <= c <= '\u9fff' for c in query):
+            # Try to translate the query using Gemini
+            try:
+                import asyncio
+                translate_prompt = f"Translate the following Chinese query to English for document search, keep it concise: '{query}'"
+                
+                # Create a temporary event loop for sync context if needed
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # We're likely in a sync context being called during async execution
+                        # Create a new temporary event loop
+                        temp_loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(temp_loop)
+                        try:
+                            translation = temp_loop.run_until_complete(
+                                self.gemini_service.generate_completion(translate_prompt)
+                            )
+                        finally:
+                            temp_loop.close()
+                            asyncio.set_event_loop(loop)
+                    else:
+                        # Normal case, we can use the existing event loop
+                        translation = loop.run_until_complete(
+                            self.gemini_service.generate_completion(translate_prompt)
+                        )
+                except RuntimeError:
+                    # Likely no event loop exists in this thread
+                    translation = asyncio.run(
+                        self.gemini_service.generate_completion(translate_prompt)
+                    )
+                
+                # Clean up the translation
+                translation = translation.strip('"\'').strip()
+                
+                # Add the translation to expanded terms if it's not empty and not already in the query
+                if translation and translation.lower() not in query.lower():
+                    expanded_terms.append(translation)
+                
+                print(f"Expanded Chinese query '{query}' with translation: '{translation}'")
+            except Exception as e:
+                print(f"Error translating query: {e}")
+        
+        # Construct the expanded query
+        expanded_query = query
+        if expanded_terms:
+            expanded_terms_str = " ".join(expanded_terms)
+            expanded_query = f"{query} {expanded_terms_str}"
+            print(f"Expanded query from '{query}' to '{expanded_query}'")
+        
+        return expanded_query
     
     async def add_document(self, db: Session, content: str, metadata: Dict[str, Any] = None) -> Document:
         """Add document to vector database"""
@@ -112,8 +208,24 @@ class VectorService:
             # Record search start
             print(f"Starting search for similar documents, query: '{query}'")
             
+            # Check if it's a Chinese query and expand with English terms if needed
+            is_chinese_query = any('\u4e00' <= c <= '\u9fff' for c in query)
+            
+            if is_chinese_query:
+                # Expand the query with English equivalents to improve matching
+                expanded_query = self._expand_chinese_query(query)
+                
+                # Use the expanded query for embedding generation if it's different
+                if expanded_query != query:
+                    print(f"Using expanded query for embedding: '{expanded_query}'")
+                    embedding_query = expanded_query
+                else:
+                    embedding_query = query
+            else:
+                embedding_query = query
+            
             # Generate embedding vector for query
-            query_embedding = await self.generate_embeddings(query)
+            query_embedding = await self.generate_embeddings(embedding_query)
             query_dim = len(query_embedding)
             print(f"Query vector dimension: {query_dim}")
             
@@ -132,7 +244,7 @@ class VectorService:
                 params["source"] = f"%{source_filter}%"
             
             # For Chinese queries, add additional text matching conditions
-            if any('\u4e00' <= c <= '\u9fff' for c in query):
+            if is_chinese_query:
                 # This is a Chinese query, add content matching conditions to improve recall
                 print("Chinese query detected, adding text matching conditions")
                 
@@ -148,30 +260,53 @@ class VectorService:
                     if char not in common_stopwords and len(char.strip()) > 0:
                         meaningful_chars.append(char)
                 
-                # If we have single characters, add to search conditions
+                # Add English equivalent terms for title matching
+                english_terms = []
+                for zh_term, en_terms in self.ZH_EN_KEYWORD_MAP.items():
+                    if zh_term in query:
+                        english_terms.extend(en_terms)
+                
+                # Combine all terms for search condition
+                all_search_terms = []
+                
+                # Add Chinese character conditions if available
                 if meaningful_chars:
-                    term_conditions = []
                     for i, char in enumerate(meaningful_chars):
-                        param_name = f"term_{i}"
+                        all_search_terms.append((f"term_zh_{i}", f"%{char}%"))
+                
+                # Add English term conditions
+                for i, term in enumerate(english_terms):
+                    all_search_terms.append((f"term_en_{i}", f"%{term}%"))
+                
+                # If expanded_query has additional terms, add them too
+                if is_chinese_query and expanded_query != query:
+                    for i, term in enumerate(expanded_query.split()):
+                        if term not in query and len(term) > 2:  # Only non-trivial additional terms
+                            all_search_terms.append((f"term_ex_{i}", f"%{term}%"))
+                
+                # Build the query conditions
+                if all_search_terms:
+                    term_conditions = []
+                    for param_name, param_value in all_search_terms:
                         term_conditions.append(f"title ILIKE :{param_name}")
-                        params[param_name] = f"%{char}%"
+                        params[param_name] = param_value
                     
                     # Connect term conditions with OR
                     if term_conditions:
                         where_clauses.append(f"({' OR '.join(term_conditions)})")
-                else:
-                    # If no meaningful characters found, fall back to original logic
-                    query_terms = [term for term in query.split() if len(term) > 1]
-                    if query_terms:
-                        term_conditions = []
-                        for i, term in enumerate(query_terms):
-                            param_name = f"term_{i}"
-                            term_conditions.append(f"title ILIKE :{param_name}")
-                            params[param_name] = f"%{term}%"
-                        
-                        # Connect term conditions with OR
-                        if term_conditions:
-                            where_clauses.append(f"({' OR '.join(term_conditions)})")
+            else:
+                # Regular English query, use standard word tokenization
+                query_terms = [term for term in query.split() if len(term) > 2]  # Skip very short words
+                if query_terms:
+                    term_conditions = []
+                    for i, term in enumerate(query_terms):
+                        param_name = f"term_{i}"
+                        term_conditions.append(f"title ILIKE :{param_name}")
+                        params[param_name] = f"%{term}%"
+                    
+                    # Connect term conditions with OR
+                    if term_conditions:
+                        where_clauses.append(f"({' OR '.join(term_conditions)})")
             
             # Assemble WHERE clause
             if where_clauses:
@@ -223,19 +358,29 @@ class VectorService:
                             similarity = self.cosine_similarity(query_embedding, doc_embedding)
                             compatible_docs += 1
                             
-                            # If Chinese query and title contains query terms, boost similarity score
-                            if any('\u4e00' <= c <= '\u9fff' for c in query):
+                            # If Chinese query, boost relevance for documents with matching expanded terms
+                            if is_chinese_query:
                                 title = row.title or ""
-                                query_terms = [term for term in query.split() if len(term) > 1]
                                 boost = 0
+                                
+                                # Boost for English equivalent terms
+                                for zh_term, en_terms in self.ZH_EN_KEYWORD_MAP.items():
+                                    if zh_term in query:
+                                        for en_term in en_terms:
+                                            if en_term.lower() in title.lower():
+                                                boost += 0.08  # Higher boost for mapped term matches
+                                
+                                # Add general term match boost as before
+                                query_terms = [term for term in query.split() if len(term) > 1]
                                 for term in query_terms:
                                     if term in title:
-                                        boost += 0.05  # Increase score by 0.05 for each matching term
+                                        boost += 0.05
                                 
+                                # Apply the total boost
                                 if boost > 0:
                                     original_similarity = similarity
                                     similarity = min(1.0, similarity + boost)
-                                    print(f"Document id={row.id}, title match boosts similarity: {original_similarity} -> {similarity}")
+                                    print(f"Document id={row.id}, cross-lingual match boosts similarity: {original_similarity:.4f} -> {similarity:.4f}")
                                     
                         except Exception as e:
                             print(f"Error processing document id={row.id}: {e}")

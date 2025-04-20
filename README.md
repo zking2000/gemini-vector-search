@@ -447,3 +447,40 @@ Swagger documentation provides:
 2. Structure of request and response models
 3. Parameter description and example values
 4. Online testing functionality, directly test API in browser
+
+## References and Resources
+
+In the development of this Gemini Vector Search System, we referenced the following technical resources:
+
+### Google Gemini API
+
+- [Google Generative AI Official Documentation](https://ai.google.dev/docs)
+- [Gemini API Reference](https://ai.google.dev/api/python/google/generativeai)
+- [Gemini Embedding Models](https://ai.google.dev/docs/embeddings_guide)
+
+### Vector Retrieval and RAG Technology
+
+- [Best Practices for Retrieval Augmented Generation (RAG)](https://www.pinecone.io/learn/retrieval-augmented-generation/)
+- [Google Vector Search Documentation](https://cloud.google.com/vertex-ai/docs/vector-search/overview)
+- [Practical Guide to Building RAG Applications](https://towardsdatascience.com/a-practical-guide-to-building-rag-applications-e9923bee2aa2)
+
+### Document Intelligent Processing
+
+- [PDF Processing and Text Extraction](https://pypdf2.readthedocs.io/en/latest/)
+- [Intelligent Document Chunking Techniques](https://www.pinecone.io/learn/chunking-strategies/)
+- [LangChain Document Processing Framework](https://python.langchain.com/docs/modules/data_connection/document_transformers/)
+
+### FastAPI Framework
+
+- [FastAPI Official Documentation](https://fastapi.tiangolo.com/)
+- [SQLAlchemy and FastAPI Integration](https://fastapi.tiangolo.com/tutorial/sql-databases/)
+
+### Frontend Technologies
+
+- [Ant Design React UI Library](https://ant.design/docs/react/introduce)
+- [React Framework Documentation](https://react.dev/learn)
+
+### System Architecture
+
+- [Vector Database Design Patterns](https://www.singlestore.com/blog/vector-database-design-patterns/)
+- [Building High-Performance RAG System Architecture](https://www.databricks.com/blog/llm-rag-platform-upgrade-how-build-high-accuracy-retrieval-augmented-generation-applications)
