@@ -138,72 +138,6 @@ sequenceDiagram
     API-->>Client: 13. Return query results
 ```
 
-## Main Features
-
-1. **Document Management**
-   - PDF document upload and parsing
-   - Intelligent document chunking
-   - Document vector storage
-
-2. **Vector Search**
-   - Semantic similarity retrieval
-   - Document source filtering
-
-3. **Intelligent Q&A**
-   - Question answering based on document content
-   - Structured content analysis
-   - Automatic summary generation
-
-### Directly Start Backend
-
-```bash
-python main.py
-
-# Or use uvicorn
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-### Use Bash Control Script
-
-```bash
-# Start service
-./run.sh start-backend
-
-# Stop service
-./run.sh stop-backend
-
-# View status
-./run.sh status
-
-# View logs
-./run.sh logs
-```
-
-### Command Line Options
-
-| Option | Description | Default Value |
-|--------|-------------|-------------|
-| `--host` | Service Host | 0.0.0.0 |
-| `--port` | Service Port | 8000 |
-| `--auto-reload` | Enable Auto Reload | false |
-| `--logs` | Start with Logs | false |
-| `--help`, `-h` | Display Help Information | - |
-
-## Use Swagger API Documentation
-
-The system has built-in Swagger API documentation interface, which can be accessed through the browser:
-
-```
-http://localhost:8000/docs
-```
-
-Swagger documentation provides:
-
-1. Detailed description of all API endpoints
-2. Structure of request and response models
-3. Parameter description and example values
-4. Online testing functionality, directly test API in browser
-
 ## Code Structure
 
 ```mermaid
@@ -447,3 +381,69 @@ graph TB
     Monitor -->|Performance Metrics| Dashboard[Management Dashboard]
     Monitor -->|Alert| Alert[Alert System]
 ``` 
+
+## Main Features
+
+1. **Document Management**
+   - PDF document upload and parsing
+   - Intelligent document chunking
+   - Document vector storage
+
+2. **Vector Search**
+   - Semantic similarity retrieval
+   - Document source filtering
+
+3. **Intelligent Q&A**
+   - Question answering based on document content
+   - Structured content analysis
+   - Automatic summary generation
+
+### Directly Start Backend
+
+```bash
+python main.py
+
+# Or use uvicorn
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### Use Bash Control Script
+
+```bash
+# Start service
+./run.sh start-backend
+
+# Stop service
+./run.sh stop-backend
+
+# View status
+./run.sh status
+
+# View logs
+./run.sh logs
+```
+
+### Command Line Options
+
+| Option | Description | Default Value |
+|--------|-------------|-------------|
+| `--host` | Service Host | 0.0.0.0 |
+| `--port` | Service Port | 8000 |
+| `--auto-reload` | Enable Auto Reload | false |
+| `--logs` | Start with Logs | false |
+| `--help`, `-h` | Display Help Information | - |
+
+## Use Swagger API Documentation
+
+The system has built-in Swagger API documentation interface, which can be accessed through the browser:
+
+```
+http://localhost:8000/docs
+```
+
+Swagger documentation provides:
+
+1. Detailed description of all API endpoints
+2. Structure of request and response models
+3. Parameter description and example values
+4. Online testing functionality, directly test API in browser
