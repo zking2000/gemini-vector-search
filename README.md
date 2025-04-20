@@ -154,19 +154,6 @@ sequenceDiagram
    - Structured content analysis
    - Automatic summary generation
 
-## Environment Setup
-
-1. Copy the environment variable example file or use the installation script to automatically create
-    ```
-    cp .env.example .env
-    ```
-
-2. Edit `.env` file and fill in your API key and database configuration:
-    ```
-    GOOGLE_API_KEY=your_google_api_key
-    DATABASE_URL=postgresql://username:password@localhost:5432/vector_db
-    ```
-
 ### Directly Start Backend
 
 ```bash
@@ -180,10 +167,10 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ```bash
 # Start service
-./run.sh start
+./run.sh start-backend
 
 # Stop service
-./run.sh stop
+./run.sh stop-backend
 
 # View status
 ./run.sh status
@@ -201,36 +188,6 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 | `--auto-reload` | Enable Auto Reload | false |
 | `--logs` | Start with Logs | false |
 | `--help`, `-h` | Display Help Information | - |
-
-## Log Management
-
-The system uses timestamp-named log files to ensure that new log files are created each time the service starts instead of overwriting historical records:
-
-```
-logs/
-├── app_20231020_123045.log  # Historical Log
-├── app_20231021_083012.log  # Historical Log
-└── app_20231022_094517.log  # Latest Log
-└── app_current.log -> app_20231022_094517.log  # Symbolic Link to Latest Log
-```
-
-### View Logs
-
-You can view logs in the following ways:
-
-1. **Use Control Script**:
-    ```bash
-    ./run.sh logs  # Display Latest Log
-    ```
-
-2. **Directly View Log Files**:
-    ```bash
-    # View Latest Log (Through Symbolic Link)
-    tail -f logs/app_current.log
-    
-    # View Specific Log File
-    less logs/app_20231022_094517.log
-    ```
 
 ## Use Swagger API Documentation
 
