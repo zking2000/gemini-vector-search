@@ -345,7 +345,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"prompt\": \"Who is the founder of Taoism?\",\n  \"context_query\": \"Taoism founder\",\n  \"max_context_docs\": 8,\n  \"source_filter\": \"\",\n  \"debug\": true\n}"
+              "raw": "{\n  \"prompt\": \"What was the total return of the Government Pension Fund Global in 2023, and how did it compare to the benchmark index?\",\n  \"context_query\": \"\",\n  \"max_context_docs\": 8,\n  \"source_filter\": \"\",\n  \"debug\": true\n}"
             },
             "url": {
               "raw": "http://35.246.2.155:8000/api/v1/integration",
