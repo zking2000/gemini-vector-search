@@ -25,6 +25,27 @@ aiplatform.init(project=PROJECT_ID, location=REGION)
 class GeminiService:
     """Gemini model service wrapper"""
     
+    # Topic configurations - moved from hardcoded values to class configuration
+    TOPIC_CONFIGS = {
+        "taoism": {
+            "keywords": ["道教", "老子", "道德经", "太上老君", "张道陵"],
+            "guidance": """The reference materials contain information about Taoism. Please read carefully and extract relevant content to answer the question.
+Note the historical development of Taoism, key figures (such as Laozi, Zhang Daoling, etc.), and core concepts (such as Dao, De, Wu Wei, etc.).
+If the question is about the founder of Taoism, pay special attention to content about Laozi, Zhang Daoling, and the Five Pecks of Rice Taoism."""
+        },
+        "buddhism": {
+            "keywords": ["佛教", "释迦牟尼", "佛陀", "菩萨", "禅宗"],
+            "guidance": """The reference materials contain information about Buddhism. Please read carefully and extract relevant content to answer the question.
+Note the historical development of Buddhism, key figures (such as Shakyamuni, Bodhisattvas, etc.), and core concepts (such as the Four Noble Truths, the Eightfold Path, etc.).
+If the question is about the founder of Buddhism, pay special attention to content about Buddha Shakyamuni (Siddhartha Gautama)."""
+        }
+    }
+    
+    # Special terms for relevance detection
+    RELEVANCE_TERMS = {
+        "religion": ["道教", "老子", "佛教", "释迦牟尼"]
+    }
+    
     def __init__(self):
         self.model_id = "gemini-2.0-flash"
         self.embedding_model_name = "models/gemini-embedding-exp-03-07"  # Updated to correct model name format
@@ -157,6 +178,26 @@ class GeminiService:
         response = model.generate_content(prompt)
         return response.text
         
+    def _identify_topic(self, query: str) -> Tuple[bool, Optional[str], Optional[str]]:
+        """Identify query topic and return relevant guidance
+        
+        Args:
+            query: The user query
+            
+        Returns:
+            Tuple containing:
+                - is_match: Whether a topic was matched
+                - topic_name: Name of matched topic or None
+                - guidance: Topic-specific guidance or None
+        """
+        for topic_name, config in self.TOPIC_CONFIGS.items():
+            keywords = config.get("keywords", [])
+            for keyword in keywords:
+                if keyword in query:
+                    return True, topic_name, config.get("guidance", "")
+        
+        return False, None, None
+        
     async def prepare_context(self, query: str, similar_docs: List[Dict[str, Any]]) -> str:
         """Prepare prompt context containing relevant documents"""
         # Detect if it's a Chinese query
@@ -165,15 +206,10 @@ class GeminiService:
         if is_chinese_query:
             context = "Below are document contents relevant to your query:\n\n"
             
-            # Add additional guidance for Chinese queries
-            if "道教" in query or "老子" in query:
-                context += """The reference materials contain information about Taoism. Please read carefully and extract relevant content to answer the question.
-Note the historical development of Taoism, key figures (such as Laozi, Zhang Daoling, etc.), and core concepts (such as Dao, De, Wu Wei, etc.).
-If the question is about the founder of Taoism, pay special attention to content about Laozi, Zhang Daoling, and the Five Pecks of Rice Taoism.\n\n"""
-            elif "佛教" in query or "释迦牟尼" in query:
-                context += """The reference materials contain information about Buddhism. Please read carefully and extract relevant content to answer the question.
-Note the historical development of Buddhism, key figures (such as Shakyamuni, Bodhisattvas, etc.), and core concepts (such as the Four Noble Truths, the Eightfold Path, etc.).
-If the question is about the founder of Buddhism, pay special attention to content about Buddha Shakyamuni (Siddhartha Gautama).\n\n"""
+            # Use the topic identification method instead of hardcoded checks
+            is_topic_match, topic_name, topic_guidance = self._identify_topic(query)
+            if is_topic_match and topic_guidance:
+                context += f"{topic_guidance}\n\n"
         else:
             context = "Below is information relevant to your query:\n\n"
         
@@ -185,7 +221,13 @@ If the question is about the founder of Buddhism, pay special attention to conte
         for doc in sorted_docs:
             similarity = doc.get("similarity", 0)
             content = doc.get("content", "")
-            if similarity > 0.7 or any(term in content for term in ["道教", "老子", "佛教", "释迦牟尼"] if term in query):
+            
+            # Use the configured relevance terms instead of hardcoded values
+            all_relevance_terms = []
+            for term_list in self.RELEVANCE_TERMS.values():
+                all_relevance_terms.extend(term_list)
+                
+            if similarity > 0.7 or any(term in content for term in all_relevance_terms if term in query):
                 has_highly_relevant = True
                 break
         
