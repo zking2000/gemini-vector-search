@@ -258,12 +258,12 @@ async def integration_query(
         # Expand search query to improve matching ability for Chinese content
         expanded_terms = []
         if "道教" in search_query:
-            expanded_terms = ["道教", "老子", "道德经", "太上老君", "张道陵", "太极", "阴阳", "天师道", "五斗米道", "全真道"]
+            expanded_terms = ["道教", "老子", "道德经", "太上老君", "张道陵", "太极", "阴阳", "天师道", "五斗米道", "全真道"]  # Taoism, Laozi, Tao Te Ching, Supreme Old Lord, Zhang Daoling, Taiji, Yin-Yang, Celestial Masters, Five Pecks of Rice, Complete Perfection
         elif "佛教" in search_query:
-            expanded_terms = ["佛教", "释迦牟尼", "佛陀", "菩萨", "禅宗", "佛经", "如来", "佛祖", "涅槃", "菩提"]
+            expanded_terms = ["佛教", "释迦牟尼", "佛陀", "菩萨", "禅宗", "佛经", "如来", "佛祖", "涅槃", "菩提"]  # Buddhism, Shakyamuni, Buddha, Bodhisattva, Zen, Buddhist Scriptures, Tathagata, Founder of Buddhism, Nirvana, Bodhi
         elif is_chinese_query:
             # Add some common Chinese philosophy and religious terms for other Chinese queries
-            expanded_terms = ["中国", "哲学", "历史", "传统", "文化", "典籍", "经典"]
+            expanded_terms = ["中国", "哲学", "历史", "传统", "文化", "典籍", "经典"]  # China, philosophy, history, tradition, culture, ancient books, classics
         
         if expanded_terms:
             search_query = f"{search_query} {' '.join(expanded_terms)}"
@@ -451,7 +451,12 @@ User question: {request.prompt}
                 }
             }
         
-        return {"completion": completion}
+        # When debug is false, explicitly return response without debug_info
+        # Use CompletionResponse model's field pattern to ensure proper response
+        return CompletionResponse(
+            completion=completion,
+            debug_info=None
+        ).dict(exclude_none=True)  # This excludes None values from the response
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Integration query failed: {str(e)}")

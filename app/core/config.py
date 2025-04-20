@@ -1,84 +1,87 @@
 """
-配置管理模块 - 处理应用配置和环境变量
+Configuration Management Module - Handling application configuration and environment variables
 """
 import os
 import logging
-from pydantic_settings import BaseSettings
-from pydantic import validator
-from typing import Optional, Dict, Any, List
+from pydantic import BaseSettings, validator
+from typing import List, Optional
+from dotenv import load_dotenv
 
-logger = logging.getLogger("config")
+load_dotenv()
+
+logger = logging.getLogger("app.config")
 
 class Settings(BaseSettings):
-    """应用配置设置"""
+    """Application Configuration Settings"""
     
-    # API 配置
-    API_V1_STR: str = "/api"
-    PROJECT_NAME: str = "Gemini向量搜索平台"
-    DEBUG: bool = False
+    # API Configuration
+    API_PREFIX: str = "/api/v1"
+    PROJECT_NAME: str = "Gemini Vector Search Platform"
+    VERSION: str = "1.0.0"
     
-    # 认证配置
-    API_USERNAME: str = os.getenv("API_USERNAME", "admin")
-    API_PASSWORD: str = os.getenv("API_PASSWORD", "password")
+    # Authentication Configuration
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "dev_secret_key")
+    API_KEY: str = os.getenv("API_KEY", "")
     
-    # Google API配置
+    # Google API Configuration
     GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
-    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", None)
+    GOOGLE_APPLICATION_CREDENTIALS: str = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
     
-    # 数据库配置
-    ALLOYDB_PROJECT_ID: str = os.getenv("ALLOYDB_PROJECT_ID", "")
-    ALLOYDB_REGION: str = os.getenv("ALLOYDB_REGION", "")
-    ALLOYDB_CLUSTER_ID: str = os.getenv("ALLOYDB_CLUSTER_ID", "")
-    ALLOYDB_INSTANCE_ID: str = os.getenv("ALLOYDB_INSTANCE_ID", "")
+    # Database Configuration
     ALLOYDB_DATABASE: str = os.getenv("ALLOYDB_DATABASE", "")
-    DB_USER: str = os.getenv("DB_USER", "postgres")
+    DB_USER: str = os.getenv("DB_USER", "")
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")
+    DB_HOST: str = os.getenv("DB_HOST", "localhost")
+    DB_PORT: str = os.getenv("DB_PORT", "5432")
+    SQLITE_DB_PATH: str = os.getenv("SQLITE_DB_PATH", "app.db")
     
-    # 服务器配置
+    # Server Configuration
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
     
-    # CORS配置
+    # CORS Configuration
     CORS_ORIGINS: List[str] = ["*"]
     
-    # 缓存配置
-    CACHE_TTL: int = int(os.getenv("CACHE_TTL", "3600"))  # 默认缓存有效期1小时
-    VECTOR_CACHE_TTL: int = int(os.getenv("VECTOR_CACHE_TTL", "86400"))  # 默认向量缓存24小时
+    # Cache Configuration
+    CACHE_TTL: int = int(os.getenv("CACHE_TTL", "3600"))  # 默认缓存有效期1小时 # Default cache TTL 1 hour
+    VECTOR_CACHE_TTL: int = int(os.getenv("VECTOR_CACHE_TTL", "86400"))  # 默认向量缓存24小时 # Default vector cache TTL 24 hours
     
-    # 速率限制配置
-    RATE_LIMIT_PER_MINUTE: int = int(os.getenv("RATE_LIMIT", "120"))
+    # Rate Limit Configuration
+    RATE_LIMIT: int = int(os.getenv("RATE_LIMIT", "100"))  # 每分钟API调用限制 # API calls limit per minute
     
-    # 数据库连接字符串
-    @property
-    def DATABASE_URI(self) -> str:
-        """构建数据库连接字符串"""
-        if all([self.ALLOYDB_PROJECT_ID, self.ALLOYDB_REGION, 
-                self.ALLOYDB_CLUSTER_ID, self.ALLOYDB_INSTANCE_ID,
-                self.ALLOYDB_DATABASE, self.DB_USER, self.DB_PASSWORD]):
-            # AlloyDB连接
-            return (
-                f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@"
-                f"localhost:5432/{self.ALLOYDB_DATABASE}?sslmode=disable"
-            )
+    # Database Connection String
+    @validator("ALLOYDB_DATABASE", "DB_USER", "DB_PASSWORD", pre=True)
+    def build_database_connection(cls, v, values):
+        """Build Database Connection String"""
+        return v
+
+    DATABASE_URL: Optional[str] = None
+
+    # AlloyDB Connection
+    def __init__(self, **data):
+        super().__init__(**data)
+        if self.ALLOYDB_DATABASE and self.DB_USER and self.DB_PASSWORD:
+            self.DATABASE_URL = f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.ALLOYDB_DATABASE}"
         else:
-            # 如果环境变量不完整，使用SQLite作为备选
-            logger.warning("数据库配置不完整，使用SQLite数据库")
-            return "sqlite:///./app.db"
-    
-    # 验证Google API配置
+            # If environment variables are incomplete, use SQLite as fallback
+            logger.warning("Database configuration incomplete, using SQLite database")
+            self.DATABASE_URL = f"sqlite:///{self.SQLITE_DB_PATH}"
+
+    # Validate Google API Configuration
     @validator("GOOGLE_API_KEY")
     def validate_google_api_key(cls, v):
         if not v:
-            logger.warning("Google API密钥未设置，一些功能可能不可用")
+            logger.warning("Google API key not set, some features may not be available")
         return v
-    
+
     class Config:
         case_sensitive = True
         env_file = ".env"
 
-# 创建全局设置对象
+
+# Create global settings object
 settings = Settings()
 
-def get_settings() -> Settings:
-    """返回应用设置对象"""
+def get_settings():
+    """Return application settings object"""
     return settings 

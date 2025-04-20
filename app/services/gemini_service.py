@@ -10,62 +10,62 @@ from vertexai.language_models import TextEmbeddingModel
 
 load_dotenv()
 
-# 配置Google Cloud
+# Configure Google Cloud
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
-REGION = "us-central1"  # 可根据需要调整
+REGION = "us-central1"  # Can be adjusted as needed
 API_KEY = os.getenv("GOOGLE_API_KEY")
 
-# 初始化Google AI
+# Initialize Google AI
 if API_KEY:
     genai.configure(api_key=API_KEY)
 
-# 初始化Vertex AI
+# Initialize Vertex AI
 aiplatform.init(project=PROJECT_ID, location=REGION)
 
 class GeminiService:
-    """Gemini模型服务封装"""
+    """Gemini model service wrapper"""
     
     def __init__(self):
         self.model_id = "gemini-2.0-flash"
-        self.embedding_model_name = "models/gemini-embedding-exp-03-07"  # 更新为正确的模型名称格式
-        # 添加简单的嵌入缓存，用于避免重复计算
+        self.embedding_model_name = "models/gemini-embedding-exp-03-07"  # Updated to correct model name format
+        # Add simple embedding cache to avoid repeated calculations
         self.embedding_cache = {}
         
     async def generate_embedding(self, text: str) -> List[float]:
-        """生成文本的嵌入向量"""
+        """Generate embedding vector for text"""
         import time
         import random
         import hashlib
         
-        # 如果文本为空，返回全零向量
+        # If text is empty, return zero vector
         if not text.strip():
-            return [0.0] * 768  # 保持一致的768维
+            return [0.0] * 768  # Maintain consistent 768 dimensions
             
-        # 使用文本的哈希作为缓存键
+        # Use text hash as cache key
         cache_key = hashlib.md5(text.encode()).hexdigest()
         
-        # 检查缓存
+        # Check cache
         if cache_key in self.embedding_cache:
             return self.embedding_cache[cache_key]
         
-        # 最大重试次数
+        # Maximum retry attempts
         max_retries = 3
-        # 初始等待时间（秒）
+        # Initial wait time (seconds)
         base_wait_time = 2
         
         for retry in range(max_retries + 1):
             try:
-                # 使用正确的嵌入模型API调用
+                # Use correct embedding model API call
                 result = genai.embed_content(
                     model="models/gemini-embedding-exp-03-07",
                     content=text,
                     task_type="SEMANTIC_SIMILARITY"
                 )
                 
-                # 正确提取嵌入向量
+                # Correctly extract embedding vector
                 embedding = None
                 
-                # Google AI API返回的结构可能是字典，需要正确提取
+                # Google AI API return structure might be a dictionary, need to extract correctly
                 if isinstance(result, dict):
                     if 'embedding' in result:
                         embedding = result['embedding']
@@ -74,81 +74,81 @@ class GeminiService:
                     elif 'values' in result:
                         embedding = result['values']
                     else:
-                        # 检查嵌套结构
-                        print(f"嵌入结果结构: {result.keys()}")
+                        # Check nested structure
+                        print(f"Embedding result structure: {result.keys()}")
                 else:
-                    # 尝试使用属性访问
+                    # Try using attribute access
                     try:
                         embedding = result.embedding
                     except AttributeError:
                         try:
                             embedding = result.embeddings[0]
                         except (AttributeError, IndexError):
-                            print(f"嵌入结果类型: {type(result)}")
+                            print(f"Embedding result type: {type(result)}")
                 
                 if embedding:
-                    # 保证维度一致 - 截断或填充到768维
+                    # Ensure consistent dimensions - truncate or pad to 768 dimensions
                     embedding_length = len(embedding)
                     if embedding_length != 768:
-                        print(f"嵌入向量维度不是768 ({embedding_length})，进行调整")
+                        print(f"Embedding vector dimension is not 768 ({embedding_length}), adjusting")
                         if embedding_length > 768:
-                            # 截断到768维
+                            # Truncate to 768 dimensions
                             embedding = embedding[:768]
                         else:
-                            # 填充到768维
+                            # Pad to 768 dimensions
                             embedding = embedding + [0.0] * (768 - embedding_length)
                     
-                    # 保存到缓存
+                    # Save to cache
                     self.embedding_cache[cache_key] = embedding
                     return embedding
                 
             except Exception as e:
                 error_message = str(e)
-                print(f"生成嵌入向量时出错: {error_message}")
+                print(f"Error generating embedding vector: {error_message}")
                 
-                # 检查是否是配额限制错误
+                # Check if quota limit error
                 if "429" in error_message or "Resource has been exhausted" in error_message:
                     if retry < max_retries:
-                        # 计算等待时间（指数退避）
+                        # Calculate wait time (exponential backoff)
                         wait_time = base_wait_time * (2 ** retry) + random.uniform(0, 1)
-                        print(f"API配额限制，等待 {wait_time:.2f} 秒后重试 ({retry+1}/{max_retries})...")
+                        print(f"API quota limit, waiting {wait_time:.2f} seconds before retry ({retry+1}/{max_retries})...")
                         time.sleep(wait_time)
                         continue
                     else:
-                        print("达到最大重试次数，使用随机向量")
+                        print("Maximum retry attempts reached, using random vector")
                 
-                # 对于其他错误或重试失败后，使用随机向量
+                # For other errors or after failed retries, use random vector
                 break
                 
-        # 所有重试都失败，返回随机向量 - 使用固定768维度
-        print("使用随机向量作为嵌入向量")
-        random_embedding = list(np.random.rand(768))  # 始终返回768维随机向量
+        # All retries failed, return random vector - use fixed 768 dimensions
+        print("Using random vector as embedding")
+        random_embedding = list(np.random.rand(768))  # Always return 768-dimensional random vector
         
-        # 保存随机向量到缓存，避免对同一文本重复生成不同的随机向量
+        # Save random vector to cache to avoid generating different random vectors for the same text
         self.embedding_cache[cache_key] = random_embedding
         return random_embedding
         
     async def generate_embeddings_batch(self, texts: List[str], batch_size: int = 5) -> List[List[float]]:
-        """批量生成文本的嵌入向量，减少API调用次数"""
+        """Batch generate embedding vectors for texts, reducing API call frequency"""
         results = []
-        # 将输入分成多个批次
+        # Split input into multiple batches
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i+batch_size]
-            print(f"处理嵌入批次 {i//batch_size + 1}/{(len(texts) + batch_size - 1)//batch_size}, 大小: {len(batch)}")
+            print(f"Processing embedding batch {i//batch_size + 1}/{(len(texts) + batch_size - 1)//batch_size}, size: {len(batch)}")
             
-            # 并行处理批次中的每个文本
+            # Process each text in the batch in parallel
             import asyncio
             embeddings = await asyncio.gather(*[self.generate_embedding(text) for text in batch])
             results.extend(embeddings)
             
-            # 在批次之间添加短暂延迟以避免超出API限制
+            # Add brief delay between batches to avoid exceeding API limits
             if i + batch_size < len(texts):
                 await asyncio.sleep(1)
                 
         return results
         
     async def generate_completion(self, prompt: str, context: Optional[str] = None) -> str:
-        """使用Gemini生成文本补全"""
+        """Generate text completion using Gemini"""
         model = genai.GenerativeModel(self.model_id)
         
         if context:
@@ -158,29 +158,29 @@ class GeminiService:
         return response.text
         
     async def prepare_context(self, query: str, similar_docs: List[Dict[str, Any]]) -> str:
-        """准备提示上下文，包含相关文档"""
-        # 检测是否为中文查询
+        """Prepare prompt context containing relevant documents"""
+        # Detect if it's a Chinese query
         is_chinese_query = any('\u4e00' <= c <= '\u9fff' for c in query)
         
         if is_chinese_query:
-            context = "以下是与你的查询相关的文档内容：\n\n"
+            context = "Below are document contents relevant to your query:\n\n"
             
-            # 为中文查询添加额外指导
+            # Add additional guidance for Chinese queries
             if "道教" in query or "老子" in query:
-                context += """参考资料中包含关于道教的信息。请仔细阅读并提取相关内容来回答问题。
-注意道教的历史发展、主要人物（如老子、张道陵等）以及核心概念（如道、德、无为等）。
-如果问题是关于道教创始人，请特别注意关于老子、张道陵和五斗米道的内容。\n\n"""
+                context += """The reference materials contain information about Taoism. Please read carefully and extract relevant content to answer the question.
+Note the historical development of Taoism, key figures (such as Laozi, Zhang Daoling, etc.), and core concepts (such as Dao, De, Wu Wei, etc.).
+If the question is about the founder of Taoism, pay special attention to content about Laozi, Zhang Daoling, and the Five Pecks of Rice Taoism.\n\n"""
             elif "佛教" in query or "释迦牟尼" in query:
-                context += """参考资料中包含关于佛教的信息。请仔细阅读并提取相关内容来回答问题。
-注意佛教的历史发展、主要人物（如释迦牟尼、菩萨等）以及核心概念（如四谛、八正道等）。
-如果问题是关于佛教创始人，请特别关注释迦牟尼佛（悉达多·乔达摩）的内容。\n\n"""
+                context += """The reference materials contain information about Buddhism. Please read carefully and extract relevant content to answer the question.
+Note the historical development of Buddhism, key figures (such as Shakyamuni, Bodhisattvas, etc.), and core concepts (such as the Four Noble Truths, the Eightfold Path, etc.).
+If the question is about the founder of Buddhism, pay special attention to content about Buddha Shakyamuni (Siddhartha Gautama).\n\n"""
         else:
-            context = "以下是与你的查询相关的信息：\n\n"
+            context = "Below is information relevant to your query:\n\n"
         
-        # 按相似度排序，确保最相关的文档在前面
+        # Sort by similarity to ensure most relevant documents come first
         sorted_docs = sorted(similar_docs, key=lambda x: x.get("similarity", 0), reverse=True)
         
-        # 分析文档内容以检测是否有特别相关的内容
+        # Analyze document content to detect if there's particularly relevant content
         has_highly_relevant = False
         for doc in sorted_docs:
             similarity = doc.get("similarity", 0)
@@ -189,9 +189,9 @@ class GeminiService:
                 has_highly_relevant = True
                 break
         
-        # 添加文档内容到上下文
+        # Add document content to context
         for i, doc in enumerate(sorted_docs):
-            # 获取文档元数据，尤其是来源信息
+            # Get document metadata, especially source information
             metadata = doc.get("metadata", {})
             if isinstance(metadata, str):
                 try:
@@ -200,7 +200,7 @@ class GeminiService:
                     metadata = {}
             
             doc_id = doc.get("id", "")
-            # 获取来源，尝试多个可能的字段
+            # Get source, try multiple possible fields
             source = (
                 metadata.get("source", "") or 
                 doc.get("source", "") or 
@@ -209,157 +209,245 @@ class GeminiService:
             )
             
             if not source and doc_id:
-                source = f"文档ID: {doc_id}"
+                source = f"Document ID: {doc_id}"
             elif not source:
-                source = f"文档片段 #{i+1}"
+                source = f"Document Fragment #{i+1}"
                 
-            # 获取块信息
+            # Get chunk information
             chunk_info = ""
             if "chunk" in metadata and "total_chunks" in metadata:
-                chunk_info = f"(第{metadata['chunk']}/{metadata['total_chunks']}块)"
+                chunk_info = f"(Chunk {metadata['chunk']}/{metadata['total_chunks']})"
             
-            # 获取相似度
+            # Get similarity
             similarity = doc.get("similarity", 0)
-            similarity_info = f"相似度: {similarity:.2f}" if similarity else ""
+            similarity_info = f"Similarity: {similarity:.2f}" if similarity else ""
             
-            # 添加完整的文档内容，带有更好的格式
+            # Add complete document content with better formatting
             content = doc.get("content", "").strip()
             if content:
-                document_header = f"文档 {i+1} {chunk_info} {similarity_info}:"
+                document_header = f"Document {i+1} {chunk_info} {similarity_info}:"
                 if is_chinese_query:
-                    # 为中文内容添加更简洁的分隔，避免使用大量的"="符号
+                    # Add more concise separation for Chinese content, avoid using too many "=" symbols
                     context += f"{document_header}\n---\n{content}\n---\n\n"
                 else:
                     context += f"{document_header}\n{content}\n\n"
         
-        # 为中文查询添加特定指示
+        # Add specific instructions for Chinese queries
         if is_chinese_query:
             if has_highly_relevant:
-                # 有高度相关的内容
-                context += """请基于上述文档内容回答以下问题。请特别注意：
-1. 从文档中提取与问题最相关的信息
-2. 组织信息形成有逻辑、有条理的回答
-3. 如果文档中信息不足或有矛盾，请明确指出
-4. 以用户能够理解的方式解释专业概念
-5. 首先确定问题的核心，然后有针对性地从文档中寻找答案"""
+                # Has highly relevant content
+                context += """Please answer the following question based on the document content above. Please pay special attention to:
+1. Extract the information most relevant to the question from the documents
+2. Organize information to form logical and structured answers
+3. If information in the documents is insufficient or contradictory, clearly indicate this
+4. Explain professional concepts in a way users can understand
+5. First identify the core of the question, then look for answers from the documents in a targeted manner"""
             else:
-                # 没有高度相关的内容
-                context += """请基于上述文档内容回答以下问题，如果文档中没有足够信息，请明确指出：
-1. 优先使用文档中的信息回答问题
-2. 明确指出哪些部分是从文档中提取的，哪些是基于一般知识补充的
-3. 如果文档中完全没有相关信息，请明确告知用户"""
-        else:
-            context += "请基于上述信息回答以下问题："
-            
+                # No highly relevant content
+                context += """Please answer the following question based on the document content above. If there is not enough information in the documents, please clearly indicate this:
+1. Prioritize using information from the documents to answer the question
+2. Clearly indicate which parts are extracted from the documents and which are supplemented based on general knowledge
+3. If there is no relevant information in the documents at all, please clearly inform the user"""
+        
         return context
-        
+
     async def determine_chunking_strategy(self, text_sample: str, file_type: str) -> Tuple[int, int, List[Dict]]:
-        """使用Gemini分析文档内容，确定最佳分块策略"""
-        model = genai.GenerativeModel(self.model_id)
-        
-        # 限制样本大小以避免超出模型上下文窗口
-        text_sample = text_sample[:10000] if len(text_sample) > 10000 else text_sample
-        
-        prompt = f"""
-分析以下{file_type.upper()}文档的内容，并确定最佳的文本分块策略。
-
-文档样本内容开始:
-{text_sample}
-文档样本内容结束
-
-任务:
-分析文档结构和内容，推荐最佳分块策略。
-
-请以JSON格式回复，不要使用markdown格式或代码块，直接返回JSON对象:
-{{"strategy": "fixed_size", "chunk_size": 数字, "overlap": 数字}}
-
-例如:
-{{"strategy": "fixed_size", "chunk_size": 1500, "overlap": 300}}
-"""
-        
-        try:
-            response = model.generate_content(prompt)
-            response_text = response.text.strip()
-            
-            # 删除markdown代码块标记
-            response_text = re.sub(r'```(?:json)?\s*', '', response_text)
-            response_text = re.sub(r'\s*```', '', response_text)
-            
-            print(f"处理后的JSON响应: {response_text}")
-            
-            # 提取JSON对象
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                result_str = json_match.group(0)
-                try:
-                    result = json.loads(result_str)
-                except json.JSONDecodeError as e:
-                    print(f"JSON解析错误: {e}, 原始文本: {result_str}")
-                    return 1000, 200, []
-            else:
-                print(f"无法从响应中提取JSON: {response_text}")
-                return 1000, 200, []
-            
-            # 获取分块参数
-            chunk_size = result.get("chunk_size", 1000)
-            overlap = result.get("overlap", 200)
-            custom_chunks = result.get("custom_chunks", [])
-            
-            # 确保chunk_size和overlap不为None
-            if chunk_size is None:
-                chunk_size = 1000
-            if overlap is None:
-                overlap = 200
-                
-            print(f"成功解析分块策略: chunk_size={chunk_size}, overlap={overlap}")
-            return chunk_size, overlap, custom_chunks
-        except Exception as e:
-            print(f"确定分块策略时出错: {e}")
-            # 返回默认值
-            return 1000, 200, []
-    
-    async def intelligent_chunking(self, text: str, file_type: str) -> List[Dict]:
-        """智能分块处理
+        """Determine the best chunking strategy for document text
         
         Args:
-            text: 要分块的完整文本
-            file_type: 文件类型
+            text_sample: Sample text from document for analysis
+            file_type: Type of the document file (pdf, txt, etc.)
             
         Returns:
-            chunks: 包含内容和元数据的分块列表
+            Tuple containing chunk size, overlap size, and optional strategy info
         """
-        # 获取前10000个字符作为样本
-        text_sample = text[:10000]
+        # Default values for fixed size chunking
+        default_chunk_size = 1000
+        default_overlap = 200
         
-        # 确定分块策略
-        chunk_size, overlap, custom_chunks = await self.determine_chunking_strategy(text_sample, file_type)
+        # If text sample is too short, return default values
+        if len(text_sample) < 1000:
+            return default_chunk_size, default_overlap, []
         
-        # 如果模型返回了自定义分块，直接使用
-        if custom_chunks:
-            return custom_chunks
+        try:
+            # Create prompt for analyzing document structure
+            prompt = f"""Analyze the following document text sample and recommend a chunking strategy for vector storage. 
+The document appears to be a {file_type.upper()} file.
+
+Document Sample:
+---
+{text_sample[:3000]}  # Limit sample size
+---
+
+Based on this sample, determine:
+1. Is this document structured with clear sections, chapters, or paragraphs?
+2. What would be the ideal chunk size (in characters) considering the document structure?
+3. How much overlap between chunks is recommended?
+4. Are there any special considerations for this document type?
+
+Return your analysis as a structured JSON object with the following fields:
+- chunk_size: (integer) Recommended size in characters
+- overlap: (integer) Recommended overlap in characters  
+- strategy: (string) One of ["fixed_size", "paragraph", "section", "semantic"]
+- reasoning: (string) Brief explanation of your recommendation
+- additional_notes: (string) Any special considerations
+
+JSON response only:"""
+            
+            # Generate analysis
+            print("Generating document structure analysis...")
+            model = genai.GenerativeModel("gemini-1.5-pro")
+            response = model.generate_content(prompt)
+            response_text = response.text
+            
+            # Try to extract JSON from response
+            try:
+                # Remove any markdown formatting if present
+                json_text = response_text
+                if "```json" in json_text:
+                    json_text = json_text.split("```json")[1].split("```")[0].strip()
+                elif "```" in json_text:
+                    json_text = json_text.split("```")[1].split("```")[0].strip()
+                
+                recommendation = json.loads(json_text)
+                
+                # Extract values with validation
+                chunk_size = int(recommendation.get("chunk_size", default_chunk_size))
+                if chunk_size < 100 or chunk_size > 10000:
+                    print(f"Invalid chunk_size recommended: {chunk_size}, using default")
+                    chunk_size = default_chunk_size
+                    
+                overlap = int(recommendation.get("overlap", default_overlap))
+                if overlap < 0 or overlap > chunk_size // 2:
+                    print(f"Invalid overlap recommended: {overlap}, using default")
+                    overlap = default_overlap
+                
+                strategy = recommendation.get("strategy", "fixed_size")
+                reasoning = recommendation.get("reasoning", "")
+                notes = recommendation.get("additional_notes", "")
+                
+                print(f"Recommended chunking strategy: {strategy}, chunk_size: {chunk_size}, overlap: {overlap}")
+                
+                return chunk_size, overlap, [recommendation]
+                
+            except json.JSONDecodeError:
+                print(f"Could not parse JSON from response: {response_text}")
+                return default_chunk_size, default_overlap, []
+                
+        except Exception as e:
+            print(f"Error determining chunking strategy: {e}")
+            return default_chunk_size, default_overlap, []
+
+    async def intelligent_chunking(self, text: str, file_type: str) -> List[Dict]:
+        """Intelligently chunk document text based on content and structure
         
-        # 否则使用推荐的chunk_size和overlap进行分块
-        chunks = []
-        sentences = text.replace('\n', ' ').split('. ')
-        current_chunk = ""
+        Args:
+            text: Full document text
+            file_type: Type of the document file (pdf, txt, etc.)
+            
+        Returns:
+            List of chunks, each containing content and metadata
+        """
+        # Sample the text to determine chunking strategy
+        text_sample = text[:5000]
+        chunk_size, overlap, strategy_info = await self.determine_chunking_strategy(text_sample, file_type)
         
-        for sentence in sentences:
-            if len(current_chunk) + len(sentence) < chunk_size:
-                current_chunk += sentence + ". "
-            else:
+        # If very short text, don't chunk
+        if len(text) < chunk_size // 2:
+            return [{
+                "content": text,
+                "metadata": {
+                    "strategy": "no_chunking",
+                    "chunk_index": 1,
+                    "total_chunks": 1
+                }
+            }]
+        
+        strategy = strategy_info[0].get("strategy", "fixed_size") if strategy_info else "fixed_size"
+        
+        if strategy == "paragraph":
+            # Split by paragraphs
+            paragraphs = [p for p in text.split("\n\n") if p.strip()]
+            
+            chunks = []
+            current_chunk = ""
+            current_chunks = []
+            
+            for i, para in enumerate(paragraphs):
+                # If paragraph is too long, split it further
+                if len(para) > chunk_size:
+                    if current_chunk:
+                        chunks.append({
+                            "content": current_chunk,
+                            "metadata": {
+                                "strategy": "paragraph",
+                                "chunk_index": len(chunks) + 1
+                            }
+                        })
+                        current_chunk = ""
+                    
+                    # Split long paragraph into smaller pieces
+                    for j in range(0, len(para), chunk_size - overlap):
+                        sub_chunk = para[j:j + chunk_size]
+                        if sub_chunk:
+                            chunks.append({
+                                "content": sub_chunk,
+                                "metadata": {
+                                    "strategy": "paragraph_split",
+                                    "chunk_index": len(chunks) + 1,
+                                    "paragraph_index": i + 1
+                                }
+                            })
+                else:
+                    # Add paragraph to current chunk
+                    if len(current_chunk) + len(para) > chunk_size:
+                        # Current chunk is full, save it and start a new one
+                        chunks.append({
+                            "content": current_chunk,
+                            "metadata": {
+                                "strategy": "paragraph",
+                                "chunk_index": len(chunks) + 1
+                            }
+                        })
+                        current_chunk = para
+                    else:
+                        # Add to current chunk
+                        current_chunk += ("\n\n" if current_chunk else "") + para
+            
+            # Add the last chunk if not empty
+            if current_chunk:
                 chunks.append({
                     "content": current_chunk,
-                    "metadata": {}
+                    "metadata": {
+                        "strategy": "paragraph",
+                        "chunk_index": len(chunks) + 1
+                    }
                 })
-                # 保留一些重叠，以维持上下文连贯性
-                current_chunk = current_chunk[-overlap:] if overlap > 0 else ""
-                current_chunk += sentence + ". "
-        
-        # 添加最后一个块
-        if current_chunk:
-            chunks.append({
-                "content": current_chunk,
-                "metadata": {}
-            })
-        
-        return chunks 
+            
+            # Add total chunks to metadata
+            for chunk in chunks:
+                chunk["metadata"]["total_chunks"] = len(chunks)
+            
+            return chunks
+            
+        else:
+            # Default to fixed size chunking
+            chunks = []
+            for i in range(0, len(text), chunk_size - overlap):
+                chunk_text = text[i:i + chunk_size]
+                if chunk_text.strip():
+                    chunks.append({
+                        "content": chunk_text,
+                        "metadata": {
+                            "strategy": "fixed_size",
+                            "chunk_size": chunk_size,
+                            "overlap": overlap,
+                            "chunk_index": len(chunks) + 1
+                        }
+                    })
+            
+            # Add total chunks to metadata
+            for chunk in chunks:
+                chunk["metadata"]["total_chunks"] = len(chunks)
+            
+            return chunks 

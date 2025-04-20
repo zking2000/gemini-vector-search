@@ -1,30 +1,30 @@
 """
-数据库初始化脚本，用于创建必要的扩展和表
+Database initialization script for creating necessary extensions and tables
 """
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.db.database import engine, Base
-from app.models.vector_models import Document  # 导入所有模型以确保它们被创建
+from app.models.vector_models import Document  # Import all models to ensure they are created
 
 def init_db():
-    """初始化数据库，创建表和扩展"""
+    """Initialize database, create tables and extensions"""
     
-    # 创建所有表
+    # Create all tables
     Base.metadata.create_all(bind=engine)
     
-    # 创建数据库会话
+    # Create database session
     with engine.connect() as conn:
-        # 启用pgvector扩展
+        # Enable pgvector extension
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
         
-        # 确保存在序列
+        # Ensure sequence exists
         conn.execute(text("CREATE SEQUENCE IF NOT EXISTS document_id_seq;"))
         
-        # 如果documents表已经存在，确保id列使用序列
+        # If documents table already exists, ensure id column uses sequence
         conn.execute(text("""
             DO $$
             BEGIN
-                -- 检查是否已经存在序列关联
+                -- Check if sequence association already exists
                 IF NOT EXISTS (
                     SELECT 1 
                     FROM pg_depend d 
@@ -32,7 +32,7 @@ def init_db():
                     WHERE c.relname = 'documents' 
                     AND d.refobjid = (SELECT oid FROM pg_class WHERE relname = 'document_id_seq')
                 ) THEN
-                    -- 尝试将序列与id列关联
+                    -- Try to associate sequence with id column
                     BEGIN
                         ALTER TABLE documents ALTER COLUMN id SET DEFAULT nextval('document_id_seq');
                     EXCEPTION WHEN OTHERS THEN
@@ -45,7 +45,7 @@ def init_db():
         
         conn.commit()
         
-    print("数据库初始化完成。表、序列和pgvector扩展已创建。")
+    print("Database initialization complete. Tables, sequences, and pgvector extension created.")
 
 if __name__ == "__main__":
     init_db() 

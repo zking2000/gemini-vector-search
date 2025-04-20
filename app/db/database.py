@@ -8,47 +8,47 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# 设置Google凭证路径
+# Set Google credential path
 CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 if CREDENTIALS_PATH:
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = CREDENTIALS_PATH
-    print(f"已设置Google凭证路径: {CREDENTIALS_PATH}")
+    print(f"Google credential path set: {CREDENTIALS_PATH}")
 else:
-    print("警告: 未设置GOOGLE_APPLICATION_CREDENTIALS环境变量")
+    print("Warning: GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
 
-# 从环境变量获取数据库连接信息
+# Get database connection information from environment variables
 DATABASE = os.getenv("ALLOYDB_DATABASE")
 USER = os.getenv("DB_USER")
 PASSWORD = os.getenv("DB_PASSWORD")
-# 直接从环境变量获取主机和端口
-DB_HOST = os.getenv("DB_HOST", "localhost")  # 默认localhost
-DB_PORT = os.getenv("DB_PORT", "5432")  # 默认PostgreSQL端口
+# Get host and port directly from environment variables
+DB_HOST = os.getenv("DB_HOST", "localhost")  # Default: localhost
+DB_PORT = os.getenv("DB_PORT", "5432")  # Default PostgreSQL port
 
-# 构建数据库连接URL
+# Build database connection URL
 DATABASE_URL = f"postgresql://{USER}:{PASSWORD}@{DB_HOST}:{DB_PORT}/{DATABASE}"
-print(f"正在连接到数据库: {DATABASE_URL.replace(PASSWORD, '****')}")
+print(f"Connecting to database: {DATABASE_URL.replace(PASSWORD, '****')}")
 
-# 创建SQLAlchemy引擎
+# Create SQLAlchemy engine
 try:
     engine = create_engine(DATABASE_URL)
-    # 测试连接 - 使用text()包装SQL语句
+    # Test connection - using text() to wrap SQL statement
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))
-    print("数据库连接成功!")
+    print("Database connection successful!")
 except Exception as e:
-    print(f"数据库连接失败: {e}")
-    # 创建一个占位引擎，应用仍可启动但数据库功能将不可用
-    print("创建占位数据库引擎，应用将启动但数据库功能不可用")
+    print(f"Database connection failed: {e}")
+    # Create a placeholder engine, application can still start but database functions will be unavailable
+    print("Creating placeholder database engine, application will start but database functions will be unavailable")
     DATABASE_URL = f"postgresql://{USER}:{PASSWORD}@{DB_HOST}:{DB_PORT}/{DATABASE}"
     engine = create_engine(DATABASE_URL)
 
-# 创建会话
+# Create session
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# 创建Base类
+# Create Base class
 Base = declarative_base()
 
-# 获取数据库会话
+# Get database session
 def get_db():
     db = SessionLocal()
     try:
