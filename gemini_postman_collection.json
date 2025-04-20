@@ -1,17 +1,17 @@
 {
   "info": {
-    "name": "Gemini向量搜索API",
-    "description": "基于Google Gemini模型的向量搜索系统，提供文档管理、向量检索和智能问答功能",
+    "name": "Gemini Vector Search API",
+    "description": "Vector search system based on Google Gemini model, providing document management, vector retrieval and intelligent Q&A capabilities",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_postman_id": "11111111-2222-3333-4444-555555555555"
   },
   "item": [
     {
-      "name": "系统管理",
-      "description": "系统状态检查和管理操作",
+      "name": "System Management",
+      "description": "System status check and management operations",
       "item": [
         {
-          "name": "检查API健康状态",
+          "name": "Check API Health Status",
           "request": {
             "method": "GET",
             "header": [],
@@ -22,12 +22,12 @@
               "port": "8000",
               "path": ["api", "v1", "health"]
             },
-            "description": "返回API的健康状态，不需要认证"
+            "description": "Returns the health status of the API, no authentication required"
           },
           "response": []
         },
         {
-          "name": "检查数据库状态",
+          "name": "Check Database Status",
           "request": {
             "method": "GET",
             "header": [],
@@ -38,12 +38,12 @@
               "port": "8000",
               "path": ["api", "v1", "database-status"]
             },
-            "description": "返回数据库连接状态和文档数量，不需要认证"
+            "description": "Returns database connection status and document count, no authentication required"
           },
           "response": []
         },
         {
-          "name": "清空数据库",
+          "name": "Clear Database",
           "request": {
             "method": "POST",
             "header": [],
@@ -57,16 +57,16 @@
                 {
                   "key": "confirmation",
                   "value": "confirm_clear",
-                  "description": "确认操作的安全检查参数"
+                  "description": "Security check parameter for operation confirmation"
                 }
               ]
             },
-            "description": "清空数据库中的所有文档和块，需要确认参数"
+            "description": "Clear all documents and chunks in the database, confirmation parameter required"
           },
           "response": []
         },
         {
-          "name": "清空AlloyDB",
+          "name": "Clear AlloyDB",
           "request": {
             "method": "POST",
             "header": [],
@@ -83,18 +83,18 @@
                 }
               ]
             },
-            "description": "清空AlloyDB中的所有数据表"
+            "description": "Clear all data tables in AlloyDB"
           },
           "response": []
         }
       ]
     },
     {
-      "name": "文档管理",
-      "description": "文档的添加、查询和删除操作",
+      "name": "Document Management",
+      "description": "Document addition, query and deletion operations",
       "item": [
         {
-          "name": "获取文档列表",
+          "name": "Get Document List",
           "request": {
             "method": "GET",
             "header": [],
@@ -108,26 +108,26 @@
                 {
                   "key": "limit",
                   "value": "50",
-                  "description": "返回的最大文档数"
+                  "description": "Maximum number of documents to return"
                 },
                 {
                   "key": "offset",
                   "value": "0",
-                  "description": "分页偏移量"
+                  "description": "Page offset"
                 },
                 {
                   "key": "source",
                   "value": "",
-                  "description": "按来源筛选文档"
+                  "description": "Filter documents by source"
                 }
               ]
             },
-            "description": "获取所有文档的列表"
+            "description": "Get list of all documents"
           },
           "response": []
         },
         {
-          "name": "添加文档",
+          "name": "Add Document",
           "request": {
             "method": "POST",
             "header": [
@@ -138,7 +138,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"示例文档\",\n  \"content\": \"这是一个示例文档的内容。\",\n  \"source\": \"测试来源\",\n  \"metadata\": {\n    \"author\": \"测试用户\",\n    \"tags\": [\"示例\", \"测试\"]\n  }\n}"
+              "raw": "{\n  \"title\": \"Example Document\",\n  \"content\": \"This is content of an example document.\",\n  \"source\": \"Test Source\",\n  \"metadata\": {\n    \"author\": \"Test User\",\n    \"tags\": [\"example\", \"test\"]\n  }\n}"
             },
             "url": {
               "raw": "http://35.246.2.155:8000/api/v1/documents",
@@ -147,12 +147,12 @@
               "port": "8000",
               "path": ["api", "v1", "documents"]
             },
-            "description": "添加新文档并生成嵌入向量"
+            "description": "Add new document and generate embedding vector"
           },
           "response": []
         },
         {
-          "name": "获取文档详情",
+          "name": "Get Document Details",
           "request": {
             "method": "GET",
             "header": [],
@@ -163,12 +163,12 @@
               "port": "8000",
               "path": ["api", "v1", "documents", "{{document_id}}"]
             },
-            "description": "获取单个文档的详细信息"
+            "description": "Get detailed information of a single document"
           },
           "response": []
         },
         {
-          "name": "删除文档",
+          "name": "Delete Document",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -179,12 +179,12 @@
               "port": "8000",
               "path": ["api", "v1", "documents", "{{document_id}}"]
             },
-            "description": "删除指定的文档及其所有块"
+            "description": "Delete specified document and all its chunks"
           },
           "response": []
         },
         {
-          "name": "上传PDF文件",
+          "name": "Upload PDF File",
           "request": {
             "method": "POST",
             "header": [],
@@ -194,19 +194,19 @@
                 {
                   "key": "file",
                   "type": "file",
-                  "src": "选择PDF文件"
+                  "src": "Select PDF file"
                 },
                 {
                   "key": "source",
-                  "value": "PDF上传",
+                  "value": "PDF Upload",
                   "type": "text",
-                  "description": "文档来源"
+                  "description": "Document source"
                 },
                 {
                   "key": "metadata",
-                  "value": "{\"type\": \"pdf\", \"tags\": [\"上传文档\"]}",
+                  "value": "{\"type\": \"pdf\", \"tags\": [\"uploaded document\"]}",
                   "type": "text",
-                  "description": "JSON格式的元数据"
+                  "description": "JSON format metadata"
                 }
               ]
             },
@@ -217,12 +217,12 @@
               "port": "8000",
               "path": ["api", "v1", "upload-pdf"]
             },
-            "description": "上传PDF文件并解析其内容"
+            "description": "Upload PDF file and parse its content"
           },
           "response": []
         },
         {
-          "name": "分析文档内容",
+          "name": "Analyze Document Content",
           "request": {
             "method": "POST",
             "header": [
@@ -233,7 +233,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"document_ids\": [\"文档ID1\", \"文档ID2\"],\n  \"type\": \"summary\"\n}"
+              "raw": "{\n  \"document_ids\": [\"Document_ID_1\", \"Document_ID_2\"],\n  \"type\": \"summary\"\n}"
             },
             "url": {
               "raw": "http://35.246.2.155:8000/api/v1/analyze-documents",
@@ -242,18 +242,18 @@
               "port": "8000",
               "path": ["api", "v1", "analyze-documents"]
             },
-            "description": "使用Gemini分析文档内容并提供摘要"
+            "description": "Use Gemini to analyze document content and provide summary"
           },
           "response": []
         }
       ]
     },
     {
-      "name": "向量和补全API",
-      "description": "向量嵌入生成和文本补全功能",
+      "name": "Vector and Completion API",
+      "description": "Vector embedding generation and text completion functionality",
       "item": [
         {
-          "name": "生成文本嵌入向量",
+          "name": "Generate Text Embedding Vector",
           "request": {
             "method": "POST",
             "header": [
@@ -264,7 +264,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"text\": \"需要生成嵌入向量的文本内容\"\n}"
+              "raw": "{\n  \"text\": \"Text content to generate embedding vector\"\n}"
             },
             "url": {
               "raw": "http://35.246.2.155:8000/api/v1/embedding",
@@ -273,12 +273,12 @@
               "port": "8000",
               "path": ["api", "v1", "embedding"]
             },
-            "description": "使用Gemini模型生成文本的嵌入向量"
+            "description": "Use Gemini model to generate embedding vector for text"
           },
           "response": []
         },
         {
-          "name": "生成文本补全",
+          "name": "Generate Text Completion",
           "request": {
             "method": "POST",
             "header": [
@@ -289,7 +289,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"prompt\": \"请解释向量数据库是什么？\",\n  \"use_context\": true,\n  \"context_query\": \"向量数据库\",\n  \"max_context_docs\": 5,\n  \"temperature\": 0.7\n}"
+              "raw": "{\n  \"prompt\": \"What is vector database?\",\n  \"use_context\": true,\n  \"context_query\": \"vector database\",\n  \"max_context_docs\": 5,\n  \"temperature\": 0.7\n}"
             },
             "url": {
               "raw": "http://35.246.2.155:8000/api/v1/completion",
@@ -298,18 +298,18 @@
               "port": "8000",
               "path": ["api", "v1", "completion"]
             },
-            "description": "使用Gemini模型生成文本补全"
+            "description": "Use Gemini model to generate text completion"
           },
           "response": []
         }
       ]
     },
     {
-      "name": "搜索和问答",
-      "description": "向量搜索和智能问答功能",
+      "name": "Search and Q&A",
+      "description": "Vector search and intelligent Q&A functionality",
       "item": [
         {
-          "name": "查询相似文档",
+          "name": "Query Similar Documents",
           "request": {
             "method": "POST",
             "header": [
@@ -320,7 +320,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"向量搜索技术\",\n  \"limit\": 10,\n  \"source_filter\": \"\"\n}"
+              "raw": "{\n  \"query\": \"Vector search technology\",\n  \"limit\": 10,\n  \"source_filter\": \"\"\n}"
             },
             "url": {
               "raw": "http://35.246.2.155:8000/api/v1/query",
@@ -329,12 +329,12 @@
               "port": "8000",
               "path": ["api", "v1", "query"]
             },
-            "description": "在向量数据库中查询与输入文本相似的文档"
+            "description": "Query similar documents in vector database"
           },
           "response": []
         },
         {
-          "name": "集成查询",
+          "name": "Integration Query",
           "request": {
             "method": "POST",
             "header": [
@@ -345,7 +345,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"prompt\": \"谁是道教的创始人？\",\n  \"context_query\": \"道教 创始人\",\n  \"max_context_docs\": 8,\n  \"source_filter\": \"\",\n  \"debug\": true\n}"
+              "raw": "{\n  \"prompt\": \"Who is the founder of Taoism?\",\n  \"context_query\": \"Taoism founder\",\n  \"max_context_docs\": 8,\n  \"source_filter\": \"\",\n  \"debug\": true\n}"
             },
             "url": {
               "raw": "http://35.246.2.155:8000/api/v1/integration",
@@ -354,7 +354,7 @@
               "port": "8000",
               "path": ["api", "v1", "integration"]
             },
-            "description": "结合向量搜索和Gemini模型回答问题"
+            "description": "Combine vector search and Gemini model to answer questions"
           },
           "response": []
         }
@@ -364,7 +364,7 @@
   "variable": [
     {
       "key": "document_id",
-      "value": "替换为实际的文档ID",
+      "value": "Replace with actual document ID",
       "type": "string"
     }
   ]
