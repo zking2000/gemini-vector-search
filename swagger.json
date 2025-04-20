@@ -71,6 +71,11 @@
             "type": "number",
             "format": "float",
             "description": "Temperature parameter, controls output randomness"
+          },
+          "use_chunks": {
+            "type": "boolean",
+            "description": "Whether to use document chunks for search",
+            "default": true
           }
         }
       },
@@ -170,6 +175,11 @@
           "source_filter": {
             "type": "string",
             "description": "Filter documents by source"
+          },
+          "use_chunks": {
+            "type": "boolean",
+            "description": "Whether to use document chunks for search",
+            "default": true
           }
         }
       },
@@ -239,6 +249,11 @@
           "debug": {
             "type": "boolean",
             "description": "Whether to return debug information"
+          },
+          "use_chunks": {
+            "type": "boolean",
+            "description": "Whether to use document chunks for search",
+            "default": true
           }
         }
       },
@@ -691,6 +706,34 @@
         "tags": ["API"],
         "summary": "Integration query",
         "description": "Combine vector search and Gemini model to answer questions",
+        "parameters": [
+          {
+            "name": "source_filter",
+            "in": "query",
+            "description": "Filter results by document source",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "debug",
+            "in": "query",
+            "description": "Return detailed debugging information",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "force_use_documents",
+            "in": "query",
+            "description": "Force use document content answer even if no high similarity match found",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -730,6 +773,44 @@
         "tags": ["API"],
         "summary": "Upload PDF file",
         "description": "Upload PDF file and parse its content",
+        "parameters": [
+          {
+            "name": "use_intelligent_chunking",
+            "in": "query",
+            "description": "Whether to use Gemini for intelligent chunking",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "name": "chunk_size",
+            "in": "query",
+            "description": "If not using intelligent chunking, fixed chunk size",
+            "schema": {
+              "type": "integer",
+              "default": 1000
+            }
+          },
+          {
+            "name": "overlap",
+            "in": "query",
+            "description": "If not using intelligent chunking, fixed overlap size",
+            "schema": {
+              "type": "integer",
+              "default": 200
+            }
+          },
+          {
+            "name": "clear_existing",
+            "in": "query",
+            "description": "Clear documents in database before upload",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {

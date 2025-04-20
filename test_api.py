@@ -161,7 +161,8 @@ def test_completion_endpoint():
     data = {
         "prompt": "What are some famous philosophical thoughts in China?",
         "use_context": False,
-        "max_context_docs": 5
+        "max_context_docs": 5,
+        "use_chunks": True
     }
     response = api_request("POST", "completion", data=data)
     assert response is not None, "API request failed"
@@ -243,7 +244,8 @@ def test_query_endpoint():
     
     query_data = {
         "query": "Who is the founder of Taoism?",
-        "limit": 5
+        "limit": 5,
+        "use_chunks": True
     }
     response = api_request("POST", "query", data=query_data)
     assert response is not None, "API request failed"
@@ -260,7 +262,8 @@ def test_integration_endpoint():
         "prompt": "What are some applications of artificial intelligence?",
         "context_query": "artificial intelligence application",
         "use_context": True,
-        "max_context_docs": 5
+        "max_context_docs": 5,
+        "use_chunks": True
     }
     response = api_request("POST", "integration", data=data)
     assert response is not None, "API request failed"
@@ -275,7 +278,8 @@ def test_force_use_documents():
         "prompt": "What is a vector database?",
         "context_query": "vector database",
         "use_context": True,
-        "max_context_docs": 5
+        "max_context_docs": 5,
+        "use_chunks": True
     }
     response = api_request("POST", "integration", data=data, params={"force_use_documents": True})
     assert response is not None, "API request failed"
@@ -294,7 +298,8 @@ def test_integration_with_debug():
         "prompt": "What is machine learning?",
         "context_query": "machine learning",
         "use_context": True,
-        "max_context_docs": 5
+        "max_context_docs": 5,
+        "use_chunks": True
     }
     response = api_request("POST", "integration", data=data, params={"debug": True})
     assert response is not None, "API request failed"
@@ -351,7 +356,8 @@ def test_upload_pdf():
         params = {
             "use_intelligent_chunking": True,
             "chunk_size": 1000,
-            "overlap": 200
+            "overlap": 200,
+            "clear_existing": False
         }
         response = api_request("POST", "upload-pdf", data={}, params=params, files=files)
     

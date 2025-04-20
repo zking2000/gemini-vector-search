@@ -211,11 +211,33 @@
               ]
             },
             "url": {
-              "raw": "http://35.246.2.155:8000/api/v1/upload-pdf",
+              "raw": "http://35.246.2.155:8000/api/v1/upload-pdf?use_intelligent_chunking=true&chunk_size=1000&overlap=200&clear_existing=false",
               "protocol": "http",
               "host": ["35", "246", "2", "155"],
               "port": "8000",
-              "path": ["api", "v1", "upload-pdf"]
+              "path": ["api", "v1", "upload-pdf"],
+              "query": [
+                {
+                  "key": "use_intelligent_chunking",
+                  "value": "true",
+                  "description": "Whether to use Gemini for intelligent chunking"
+                },
+                {
+                  "key": "chunk_size",
+                  "value": "1000",
+                  "description": "If not using intelligent chunking, fixed chunk size"
+                },
+                {
+                  "key": "overlap",
+                  "value": "200",
+                  "description": "If not using intelligent chunking, fixed overlap size"
+                },
+                {
+                  "key": "clear_existing",
+                  "value": "false",
+                  "description": "Clear documents in database before upload"
+                }
+              ]
             },
             "description": "Upload PDF file and parse its content"
           },
@@ -289,7 +311,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"prompt\": \"What is vector database?\",\n  \"use_context\": true,\n  \"context_query\": \"vector database\",\n  \"max_context_docs\": 5,\n  \"temperature\": 0.7\n}"
+              "raw": "{\n  \"prompt\": \"What is vector database?\",\n  \"use_context\": true,\n  \"context_query\": \"vector database\",\n  \"max_context_docs\": 5,\n  \"temperature\": 0.7,\n  \"use_chunks\": true\n}"
             },
             "url": {
               "raw": "http://35.246.2.155:8000/api/v1/completion",
@@ -320,7 +342,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"Vector search technology\",\n  \"limit\": 10,\n  \"source_filter\": \"\"\n}"
+              "raw": "{\n  \"query\": \"Vector search technology\",\n  \"limit\": 10,\n  \"source_filter\": \"\",\n  \"use_chunks\": true\n}"
             },
             "url": {
               "raw": "http://35.246.2.155:8000/api/v1/query",
@@ -345,14 +367,31 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"prompt\": \"What was the total return of the Government Pension Fund Global in 2023, and how did it compare to the benchmark index?\",\n  \"context_query\": \"\",\n  \"max_context_docs\": 8,\n  \"source_filter\": \"\",\n  \"debug\": true\n}"
+              "raw": "{\n  \"prompt\": \"What was the total return of the Government Pension Fund Global in 2023, and how did it compare to the benchmark index?\",\n  \"context_query\": \"\",\n  \"max_context_docs\": 8,\n  \"source_filter\": \"\",\n  \"debug\": true,\n  \"use_chunks\": true\n}"
             },
             "url": {
-              "raw": "http://35.246.2.155:8000/api/v1/integration",
+              "raw": "http://35.246.2.155:8000/api/v1/integration?source_filter=&debug=true&force_use_documents=false",
               "protocol": "http",
               "host": ["35", "246", "2", "155"],
               "port": "8000",
-              "path": ["api", "v1", "integration"]
+              "path": ["api", "v1", "integration"],
+              "query": [
+                {
+                  "key": "source_filter",
+                  "value": "",
+                  "description": "Filter results by document source"
+                },
+                {
+                  "key": "debug",
+                  "value": "true",
+                  "description": "Return detailed debugging information"
+                },
+                {
+                  "key": "force_use_documents",
+                  "value": "false",
+                  "description": "Force use document content answer even if no high similarity match found"
+                }
+              ]
             },
             "description": "Combine vector search and Gemini model to answer questions"
           },
