@@ -1,0 +1,58 @@
+[
+  {
+    "question": "What was the total return of the Government Pension Fund Global in 2023, and how did it compare to the benchmark index?",
+    "answer": "The Government Pension Fund Global returned 16.1 percent in 2023. This was 0.18 percentage points lower than the return on the benchmark index."
+  },
+  {
+    "question": "What was the return on unlisted real estate investments in 2023?",
+    "answer": "Based on the provided documents, I cannot determine the specific return on unlisted real estate investments in 2023. Document 1 mentions the overall fund return (16.1%), equity return (21.3%), and fixed income return (6.1%). Document 3 mentions the value of unlisted real estate (301 billion kroner) but doesn't specify its return."
+  },
+  {
+    "question": "How much did the fund’s market value increase in 2023 and what factors contributed to it?",
+    "answer": "The fund's market value increased from 12,429 billion kroner to 15,765 billion kroner at the end of 2023. This is an increase of 3,336 billion kroner.\n\nThe contributing factors included:\n\n*   A return of 16.1 percent, or 2,222 billion kroner (Document 1).\n*   Equity investments, which constituted 70.9% of the fund with a value of 11,174 billion kroner (Document 2).\n*   Fixed income investments, which constituted 27.1% of the fund with a value of 4,272 billion kroner (Document 2).\n*   Unlisted real estate investments, which constituted 1.9% of the fund with a value of 301 billion kroner (Document 2)."
+  },
+  {
+    "question": "Which asset class had the highest return in 2023 and why?",
+    "answer": "Based on the provided documents, equities had the highest return in 2023. Document 1 states that equities had a 21.3% return, while fixed income had a 6.1% return. The documents do not provide information about *why* equities had the highest return."
+  },
+  {
+    "question": "What was the asset allocation of the fund at the end of 2023?",
+    "answer": "At the end of 2023, the asset allocation of the Government Pension Fund Global was:\n\n*   **Equities:** 11,174 billion kroner (70.9% of the fund)\n*   **Fixed income:** 4,272 billion kroner (27.1% of the fund)\n*   **Unlisted real estate:** 301 billion kroner (1.9% of the fund)"
+  },
+  {
+    "question": "How much of the fund was invested in US equities and bonds at the end of 2023?",
+    "answer": "The provided documents do not contain information about the specific amounts invested in US equities and bonds at the end of 2023. The documents provide the following information:\n\n*   The fund's total value at the end of 2023 was 15,765 billion kroner.\n*   Asset allocation: Equities (70.9%), Fixed income (27.1%), Unlisted real estate (1.9%).\n*   The fund's return in 2023 was 16.1%.\n*   Earned dividends amounted to NOK 12,580 million in 2023.\n*   Earned interest amounted to NOK 34,537 million in 2023.\n\nTo find the amounts invested in US equities and bonds, you would need a more detailed breakdown of the fund's investments by country and asset type, which is not included in these documents."
+  },
+  {
+    "question": "What percentage of the real estate investments was allocated to office properties?",
+    "answer": "Based on the provided documents, there is no information about the percentage of real estate investments allocated to office properties. The documents mention the total value of unlisted real estate investments but do not provide a breakdown of property types."
+  },
+  {
+    "question": "What are the three main investment strategies used by Norges Bank to manage the fund?",
+    "answer": "Based on the provided documents, the three main investment strategies used by Norges Bank to manage the fund are:\n\n*   **Equities:** As of the end of 2023, 70.9% of the fund was invested in equities, amounting to 11,174 billion kroner.\n*   **Fixed Income:** 27.1% of the fund was invested in fixed income, amounting to 4,272 billion kroner.\n*   **Unlisted Real Estate:** 1.9% of the fund was invested in unlisted real estate, amounting to 301 billion kroner."
+  },
+  {
+    "question": "Why did unlisted real estate investments underperform in 2023?",
+    "answer": "The provided documents do not contain information regarding the performance of unlisted real estate investments in 2023, nor do they provide reasons for any potential underperformance."
+  },
+  {
+    "question": "What is the role of responsible investment in the fund’s strategy, and how is it implemented?",
+    "answer": "Based on the provided documents, the role of responsible investment in the fund's strategy is that the fund \"shall be managed responsibly\" within the objective to \"achieve the highest possible return after costs, given an acceptable level of risk.\" (Document 2)\n\nThe documents do not provide details on *how* responsible investment is specifically implemented."
+  },
+  {
+    "question": "What are the key risks identified in the 2023 stress tests, and what potential losses were estimated?",
+    "answer": "The provided documents do not contain information about the key risks identified in the 2023 stress tests or the potential losses estimated from those tests."
+  },
+  {
+    "question": "What is the expected absolute volatility of the fund as of 2023, and what does it imply?",
+    "answer": "Based on the provided documents, there is no information about the expected absolute volatility of the fund as of 2023 or what it implies."
+  },
+  {
+    "question": "What was the average annual return of the fund from 1998 to 2023?",
+    "answer": "The provided documents do not contain information about the average annual return of the fund from 1998 to 2023. The documents primarily focus on the fund's performance in 2022 and 2023."
+  },
+  {
+    "question": "How did equity and fixed-income management contribute to relative return over the past 5 years?",
+    "answer": "Based on the provided documents, there is no information about how equity and fixed-income management contributed to relative return over the past 5 years. The documents primarily focus on the 2023 performance, asset allocation, and specific investment details like equities, bonds, and financial derivatives."
+  }
+]

@@ -1,0 +1,71 @@
+/* 针对所有元素的全局强制水平显示 */
+* {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+/* 针对文档浏览器中的元素 */
+.document-title,
+.document-content,
+.document-meta,
+.document-item,
+.document-list,
+.document-item * {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  display: block !important;
+  text-align: left !important;
+}
+
+/* 针对搜索结果页面中的元素 */
+.ant-list-item,
+.ant-list-item *,
+.ant-avatar,
+.ant-avatar *,
+.ant-list-item-meta,
+.ant-list-item-meta *,
+.ant-card,
+.ant-card * {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+}
+
+/* 针对中文文本 */
+:lang(zh),
+:lang(zh-CN),
+[lang="zh"],
+[lang="zh-CN"] {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+}
+
+/* 确保所有图标和文本内容水平显示 */
+i, span, div, p, a, h1, h2, h3, h4, h5, h6, 
+input, textarea, button, select, option, 
+label, pre, code, table, th, td, li, ul, ol {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+/* 递归地确保嵌套内容正确显示 */
+* > * {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+}
+
+/* 针对所有可能的垂直文本元素 */
+[style*="writing-mode"],
+[style*="text-orientation"],
+[style*="direction"] {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+} 

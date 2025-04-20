@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini向量搜索API - 使用指南</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3, h4 {
+            color: #1a73e8;
+            margin-top: 24px;
+        }
+        h1 {
+            border-bottom: 2px solid #eaecef;
+            padding-bottom: 10px;
+        }
+        pre {
+            background-color: #f6f8fa;
+            border-radius: 5px;
+            padding: 16px;
+            overflow: auto;
+        }
+        code {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            background-color: rgba(27, 31, 35, 0.05);
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #dfe2e5;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f6f8fa;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #1a73e8;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .btn:hover {
+            background-color: #165dbf;
+        }
+        .btn-green {
+            background-color: #4caf50;
+        }
+        .btn-green:hover {
+            background-color: #3e8e41;
+        }
+        .warning {
+            background-color: #fff8e1;
+            border-left: 4px solid #ffca28;
+            padding: 12px;
+            margin: 16px 0;
+        }
+        .note {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 12px;
+            margin: 16px 0;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        .badge-get {
+            background-color: #61affe;
+            color: white;
+        }
+        .badge-post {
+            background-color: #49cc90;
+            color: white;
+        }
+        .auth {
+            background-color: #ffeef0;
+            border-left: 4px solid #f56565;
+            padding: 12px;
+            margin: 16px 0;
+        }
+        .button-container {
+            display: flex;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Gemini向量搜索API - 使用指南</h1>
+    
+    <p>欢迎使用Gemini向量搜索API系统。本文档提供API使用的基本指南。查看完整的交互式API文档，请访问：</p>
+    
+    <div class="button-container">
+        <a href="/docs" class="btn btn-blue">API文档</a>
+        <a href="/redoc" class="btn btn-gray">ReDoc文档</a>
+    </div>
+    
+    <div class="note">
+        <strong>提示：</strong> Swagger文档提供了所有API端点的完整描述，并允许您直接在浏览器中测试API。
+    </div>
+    
+    <h2>认证说明</h2>
+    
+    <div class="auth">
+        <p>除了健康检查和状态端点外，<strong>所有API端点都需要HTTP基本认证</strong>。</p>
+        <p>请向系统管理员获取访问凭据。</p>
+    </div>
+    
+    <p>系统管理员可以通过设置环境变量 <code>API_USERNAME</code> 和 <code>API_PASSWORD</code> 来配置访问凭据。</p>
+    
+    <h3>在不同环境中使用认证</h3>
+    
+    <h4>使用curl</h4>
+    <pre><code>curl -X POST "http://服务器地址:8000/api/v1/integration" \
+     -H "Content-Type: application/json" \
+     -u 用户名:密码 \
+     -d '{"prompt": "Python是什么编程语言?"}'</code></pre>
+    
+    <h4>使用Postman</h4>
+    <ol>
+        <li>在请求的"Authorization"标签中，选择类型为"Basic Auth"</li>
+        <li>填入您的用户名和密码</li>
+        <li>点击"Send"发送请求</li>
+    </ol>
+    
+    <h4>使用Python</h4>
+    <pre><code>import requests
+
+url = "http://服务器地址:8000/api/v1/integration"
+auth = ("用户名", "密码")  # 填入您的认证信息
+payload = {"prompt": "Python是什么编程语言?"}
+
+response = requests.post(url, json=payload, auth=auth)
+print(response.json())</code></pre>
+    
+    <h2>主要功能</h2>
+    
+    <h3>1. 文档管理</h3>
+    <ul>
+        <li><span class="badge badge-post">POST</span> <code>/api/v1/upload-pdf</code> - 上传PDF文件并处理为文档块</li>
+        <li><span class="badge badge-post">POST</span> <code>/api/v1/documents</code> - 添加单个文档到向量数据库</li>
+        <li><span class="badge badge-get">GET</span> <code>/api/v1/documents</code> - 获取文档列表</li>
+        <li><span class="badge badge-get">GET</span> <code>/api/v1/documents/{document_id}</code> - 获取单个文档详情</li>
+        <li><span class="badge badge-post">POST</span> <code>/api/v1/clear-alloydb</code> - 清空数据库中的所有数据</li>
+    </ul>
+    
+    <h3>2. 向量生成和搜索</h3>
+    <ul>
+        <li><span class="badge badge-post">POST</span> <code>/api/v1/embedding</code> - 生成文本的嵌入向量</li>
+        <li><span class="badge badge-post">POST</span> <code>/api/v1/query</code> - 在向量数据库中搜索相似文档</li>
+    </ul>
+    
+    <h3>3. 文本生成</h3>
+    <ul>
+        <li><span class="badge badge-post">POST</span> <code>/api/v1/completion</code> - 使用Gemini生成文本补全</li>
+    </ul>
+    
+    <h3>4. 集成功能</h3>
+    <ul>
+        <li><span class="badge badge-post">POST</span> <code>/api/v1/integration</code> - 集成向量检索和文本生成的一体化API</li>
+        <li><span class="badge badge-post">POST</span> <code>/api/v1/analyze-documents</code> - 深入分析文档内容</li>
+    </ul>
+    
+    <h3>5. 系统工具</h3>
+    <ul class="api-list">
+        <li><span class="badge badge-get">GET</span> <code>/health</code> - 检查API健康状态</li>
+        <li><span class="badge badge-get">GET</span> <code>/database-status</code> - 检查数据库连接状态</li>
+        <li><span class="badge badge-post">POST</span> <code>/clear-database</code> - 清空数据库（需要确认）</li>
+    </ul>
+    
+    <h2>使用建议</h2>
+    <ul>
+        <li>使用Swagger UI (<a href="/docs">/docs</a>)测试API</li>
+        <li>使用集成查询API端点获得最佳问答体验</li>
+        <li>通过上传PDF文件快速导入大量文档</li>
+    </ul>
+    
+    <h2>常见问题</h2>
+    
+    <h3>如何处理大型PDF文件？</h3>
+    <p>对于大型PDF文件（超过50页），建议：</p>
+    <ol>
+        <li>使用<code>use_intelligent_chunking=true</code>启用智能分块</li>
+        <li>如果处理时间过长，可以设置<code>clear_existing=false</code>并分批上传</li>
+        <li>上传完成后检查<code>/api/v1/database-status</code>确认文档数量</li>
+    </ol>
+    
+    <h3>如何提高中文查询的搜索效果？</h3>
+    <p>系统对中文查询有特殊优化：</p>
+    <ol>
+        <li>自动检测中文查询并进行关键词扩展</li>
+        <li>使用标题匹配提升相关性</li>
+        <li>对于特定领域的查询，可以在<code>context_query</code>中添加更多专业术语</li>
+    </ol>
+    
+    <h3>如何查看已上传的文档？</h3>
+    <p>系统提供了以下方式查看已上传的文档：</p>
+    <ol>
+        <li>通过API接口 <code>GET /api/v1/documents</code> 获取文档列表数据</li>
+    </ol>
+    <p>您可以通过API接口查询文档内容、元数据和上传时间等信息。</p>
+    
+    <h2>快速入门</h2>
+    
+    <h3>步骤1：上传文档</h3>
+    <pre><code>curl -X POST "http://服务器地址:8000/api/v1/upload-pdf" \
+    -H "Content-Type: multipart/form-data" \
+    -u 用户名:密码 \
+    -F "file=@/本地路径/文档.pdf"</code></pre>
+    
+    <h3>步骤2：查询文档</h3>
+    <pre><code>curl -X POST "http://服务器地址:8000/api/v1/integration" \
+    -H "Content-Type: application/json" \
+    -u 用户名:密码 \
+    -d '{
+        "prompt": "请解释向量搜索的工作原理",
+        "context_query": "向量搜索 嵌入",
+        "max_context_docs": 5
+    }'</code></pre>
+    
+    <div class="warning">
+        <strong>注意：</strong> 请确保所有请求中的中文内容使用正确的UTF-8编码。
+    </div>
+    
+    <h2>相关文档</h2>
+    <ul>
+        <li><a href="/docs">Swagger交互式文档</a> - 完整的API规范和测试界面</li>
+        <li><a href="/redoc">ReDoc文档</a> - 另一种查看API文档的方式</li>
+    </ul>
+    
+    <hr>
+    <p style="text-align: center; color: #666; font-size: 14px;">© 2024 Gemini向量搜索API系统</p>
+</body>
+</html> 

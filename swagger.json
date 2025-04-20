@@ -1,0 +1,934 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Gemini向量搜索API",
+    "description": "基于Google Gemini模型的向量搜索系统，提供文档管理、向量检索和智能问答功能",
+    "version": "1.0.0",
+    "contact": {
+      "name": "API支持团队"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://35.246.2.155:8000/api/v1",
+      "description": "主服务器"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "EmbeddingRequest": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "需要生成嵌入向量的文本"
+          }
+        }
+      },
+      "EmbeddingResponse": {
+        "type": "object",
+        "properties": {
+          "embedding": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            },
+            "description": "生成的嵌入向量"
+          },
+          "dimensions": {
+            "type": "integer",
+            "description": "嵌入向量的维度"
+          }
+        }
+      },
+      "CompletionRequest": {
+        "type": "object",
+        "required": ["prompt"],
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "提示词"
+          },
+          "use_context": {
+            "type": "boolean",
+            "description": "是否使用上下文"
+          },
+          "context_query": {
+            "type": "string",
+            "description": "上下文查询"
+          },
+          "max_context_docs": {
+            "type": "integer",
+            "description": "最大上下文文档数"
+          },
+          "context": {
+            "type": "string",
+            "description": "手动提供的上下文"
+          },
+          "temperature": {
+            "type": "number",
+            "format": "float",
+            "description": "温度参数，控制输出随机性"
+          }
+        }
+      },
+      "CompletionResponse": {
+        "type": "object",
+        "properties": {
+          "response": {
+            "type": "string",
+            "description": "生成的回答"
+          }
+        }
+      },
+      "DocumentCreate": {
+        "type": "object",
+        "required": ["title", "content"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "文档标题"
+          },
+          "content": {
+            "type": "string",
+            "description": "文档内容"
+          },
+          "source": {
+            "type": "string",
+            "description": "文档来源"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "文档元数据"
+          }
+        }
+      },
+      "Document": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "文档ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "文档标题"
+          },
+          "content": {
+            "type": "string",
+            "description": "文档内容"
+          },
+          "source": {
+            "type": "string",
+            "description": "文档来源"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "文档元数据"
+          },
+          "chunks": {
+            "type": "integer",
+            "description": "文档分块数量"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间"
+          }
+        }
+      },
+      "DocumentsList": {
+        "type": "object",
+        "properties": {
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            },
+            "description": "文档列表"
+          },
+          "total": {
+            "type": "integer",
+            "description": "文档总数"
+          }
+        }
+      },
+      "QueryRequest": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "查询文本"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "返回的最大文档数"
+          },
+          "source_filter": {
+            "type": "string",
+            "description": "按来源筛选文档"
+          }
+        }
+      },
+      "QueryResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "块ID"
+                },
+                "document_id": {
+                  "type": "string",
+                  "description": "文档ID"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "文档标题"
+                },
+                "content": {
+                  "type": "string",
+                  "description": "块内容"
+                },
+                "source": {
+                  "type": "string",
+                  "description": "文档来源"
+                },
+                "similarity": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "相似度分数"
+                },
+                "metadata": {
+                  "type": "object",
+                  "description": "元数据"
+                }
+              }
+            },
+            "description": "查询结果"
+          }
+        }
+      },
+      "IntegrationRequest": {
+        "type": "object",
+        "required": ["prompt"],
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "提示词"
+          },
+          "context_query": {
+            "type": "string",
+            "description": "上下文查询"
+          },
+          "max_context_docs": {
+            "type": "integer",
+            "description": "最大上下文文档数"
+          },
+          "source_filter": {
+            "type": "string",
+            "description": "按来源筛选文档"
+          },
+          "debug": {
+            "type": "boolean",
+            "description": "是否返回调试信息"
+          }
+        }
+      },
+      "IntegrationResponse": {
+        "type": "object",
+        "properties": {
+          "response": {
+            "type": "string",
+            "description": "生成的回答"
+          },
+          "debug_info": {
+            "type": "object",
+            "description": "调试信息（仅当debug=true时返回）"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "API状态"
+          }
+        }
+      },
+      "DatabaseStatusResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "数据库连接状态"
+          },
+          "document_count": {
+            "type": "integer",
+            "description": "文档数量"
+          },
+          "chunk_count": {
+            "type": "integer",
+            "description": "块数量"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "string",
+            "description": "错误详情"
+          }
+        }
+      },
+      "UploadPdfResponse": {
+        "type": "object",
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "description": "上传的文档ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "文档标题"
+          },
+          "pages": {
+            "type": "integer",
+            "description": "PDF页数"
+          },
+          "chunks": {
+            "type": "integer",
+            "description": "分块数量"
+          }
+        }
+      },
+      "ClearDatabaseResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "操作状态"
+          },
+          "deleted_documents": {
+            "type": "integer",
+            "description": "删除的文档数量"
+          },
+          "deleted_chunks": {
+            "type": "integer",
+            "description": "删除的块数量"
+          }
+        }
+      },
+      "ClearAlloyDBResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "操作状态"
+          },
+          "deleted_tables": {
+            "type": "integer",
+            "description": "清空的表数量"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "操作时间"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["系统"],
+        "summary": "检查API健康状态",
+        "description": "返回API的健康状态",
+        "responses": {
+          "200": {
+            "description": "API正常运行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/database-status": {
+      "get": {
+        "tags": ["系统"],
+        "summary": "检查数据库连接状态",
+        "description": "返回数据库连接状态和文档数量",
+        "responses": {
+          "200": {
+            "description": "数据库连接正常",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseStatusResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "数据库连接错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/embedding": {
+      "post": {
+        "tags": ["API"],
+        "summary": "生成文本嵌入向量",
+        "description": "使用Gemini模型生成文本的嵌入向量",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmbeddingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功生成嵌入向量",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/completion": {
+      "post": {
+        "tags": ["API"],
+        "summary": "生成文本补全",
+        "description": "使用Gemini模型生成文本补全",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功生成文本补全",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents": {
+      "post": {
+        "tags": ["API"],
+        "summary": "添加文档",
+        "description": "添加新文档并生成嵌入向量",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "文档添加成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["API"],
+        "summary": "获取文档列表",
+        "description": "获取所有文档的列表",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回的最大文档数",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "分页偏移量",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "description": "按来源筛选文档",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功获取文档列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{document_id}": {
+      "get": {
+        "tags": ["API"],
+        "summary": "获取文档详情",
+        "description": "获取单个文档的详细信息",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "description": "文档ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功获取文档详情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "文档未找到",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["API"],
+        "summary": "删除文档",
+        "description": "删除指定的文档及其所有块",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "description": "文档ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "文档删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "操作状态"
+                    },
+                    "deleted_chunks": {
+                      "type": "integer",
+                      "description": "删除的块数量"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "文档未找到",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/query": {
+      "post": {
+        "tags": ["API"],
+        "summary": "查询相似文档",
+        "description": "在向量数据库中查询与输入文本相似的文档",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/integration": {
+      "post": {
+        "tags": ["API"],
+        "summary": "集成查询",
+        "description": "结合向量搜索和Gemini模型回答问题",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntegrationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/upload-pdf": {
+      "post": {
+        "tags": ["API"],
+        "summary": "上传PDF文件",
+        "description": "上传PDF文件并解析其内容",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "PDF文件"
+                  },
+                  "source": {
+                    "type": "string",
+                    "description": "文档来源"
+                  },
+                  "metadata": {
+                    "type": "string",
+                    "description": "JSON格式的元数据"
+                  }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "PDF上传成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadPdfResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/clear-database": {
+      "post": {
+        "tags": ["系统"],
+        "summary": "清空数据库",
+        "description": "清空数据库中的所有文档和块",
+        "parameters": [
+          {
+            "name": "confirmation",
+            "in": "query",
+            "description": "确认操作的安全检查参数",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "数据库清空成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClearDatabaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "确认参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/clear-alloydb": {
+      "post": {
+        "tags": ["系统"],
+        "summary": "清空AlloyDB",
+        "description": "清空AlloyDB中的所有数据表",
+        "parameters": [
+          {
+            "name": "confirmation",
+            "in": "query",
+            "description": "确认操作的安全检查参数，必须为'confirm_clear_alloydb'",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AlloyDB清空成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClearAlloyDBResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "确认参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "清空操作失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analyze-documents": {
+      "post": {
+        "tags": ["API"],
+        "summary": "分析文档内容",
+        "description": "使用Gemini分析文档内容并提供摘要",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "document_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "要分析的文档ID列表"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": ["summary", "key_points", "topics"],
+                    "description": "分析类型"
+                  }
+                },
+                "required": ["document_ids", "type"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "文档分析成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "string",
+                      "description": "分析结果"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+} 

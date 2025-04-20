@@ -1,0 +1,63 @@
+:root {
+  --primary-color: #1890ff;
+  --secondary-color: #52c41a;
+  --background-color: #f0f2f5;
+  --text-color: #000000d9;
+  --success-color: #52c41a;
+  --warning-color: #faad14;
+  --error-color: #ff4d4f;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--background-color);
+}
+
+.site-layout-content {
+  padding: 24px;
+  background: #fff;
+  min-height: calc(100vh - 200px);
+}
+
+/* 强制所有元素水平显示 */
+* {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+}
+
+/* 特别针对搜索结果和文档列表中的问题 */
+.ant-list-item,
+.ant-list-item *,
+.ant-avatar,
+.ant-avatar *,
+.ant-avatar-string,
+.document-title,
+.document-meta,
+.ant-list-item-meta,
+.ant-list-item-meta *,
+.ant-card .ant-list-item,
+.ant-card .ant-list-item * {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+/* 专门处理文档来源信息 */
+.document-title,
+.document-meta,
+.document-content,
+.ant-list-item-meta-title,
+.ant-list-item-meta-description {
+  display: block !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  text-align: left !important;
+} 

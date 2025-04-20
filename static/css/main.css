@@ -1,0 +1,194 @@
+/* 确保所有文本容器水平显示 */
+.document-reference,
+.document-reference *,
+.message-ai *,
+.reference-item,
+.document-meta,
+.document-title,
+.document-content,
+.ant-list-item,
+.ant-list-item-meta,
+.ant-list-item-meta-title,
+.ant-list-item-meta-description,
+.ant-typography,
+.ant-badge-count,
+.ant-list-item-content,
+.ant-list-item-extra,
+.ant-tooltip-inner,
+.ant-card-body,
+.ant-card-head-title,
+.ant-list-item-action,
+.ant-avatar,
+.ant-avatar-string,
+a, span, div, p, h1, h2, h3, h4, h5, h6, button {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  text-align: left !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+}
+
+/* 固定所有标签、卡片、列表项为块级显示 */
+.document-title,
+.ant-list-item,
+.ant-list-item-meta,
+.ant-card,
+.ant-card-body,
+.ant-tag {
+  display: block !important;
+}
+
+/* 专门处理Badge组件 */
+.ant-badge-count {
+  display: inline-block !important;
+  margin-left: 8px !important;
+}
+
+/* 强制文档片段卡片水平排列 */
+.document-card {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  margin-bottom: 10px !important;
+  padding: 8px !important;
+  background-color: #f9f9f9 !important;
+  border-left: 3px solid #1890ff !important;
+  border-radius: 3px !important;
+}
+
+.document-info {
+  display: flex !important;
+  flex-direction: column !important;
+  flex-grow: 1 !important;
+}
+
+.document-header {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 5px !important;
+  width: 100% !important;
+}
+
+.document-title {
+  font-weight: bold !important;
+  margin-right: 10px !important;
+  display: inline-block !important;
+  text-align: left !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  max-width: 200px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.similarity-badge {
+  background-color: #e6f7ff !important;
+  padding: 2px 6px !important;
+  border-radius: 10px !important;
+  font-size: 0.8em !important;
+  white-space: nowrap !important;
+  display: inline-block !important;
+}
+
+/* 全局强制设置 - 应用于所有可能的元素 */
+body .ant-list-item-meta-title,
+body .ant-list-item-meta-description,
+body .ant-typography,
+body [class*="document-"],
+body [class*="message-"],
+body .ant-avatar,
+body .ant-avatar-string,
+body .ant-list * {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+}
+
+/* 特别针对标题显示的修复 */
+.ant-list-item-meta-title * {
+  display: inline-block !important;
+  writing-mode: horizontal-tb !important;
+}
+
+/* 彻底覆盖所有可能竖排的元素 */
+* {
+  writing-mode: horizontal-tb !important;
+}
+
+/* 覆盖中文字符的特殊处理 */
+[title],
+[alt],
+div, span, p, h1, h2, h3, h4, h5, h6 {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+}
+
+/* 专门处理文档标题的竖排问题 */
+.document-title > *,
+.document-title > span,
+.document-title > div,
+.document-card span,
+.document-card div,
+.document-meta > *,
+.document-meta span,
+.document-meta div {
+  display: inline-block !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  text-align: left !important;
+}
+
+/* 针对中文内容的专门处理 */
+:lang(zh),
+:lang(zh-CN),
+[lang="zh"],
+[lang="zh-CN"],
+.document-title {
+  writing-mode: horizontal-tb !important; 
+  text-orientation: mixed !important;
+  direction: ltr !important;
+}
+
+/* 强制所有元素使用水平文本 */
+* {
+  text-orientation: mixed !important;
+}
+
+/* 强制处理ID和数字的垂直问题 */
+[id], 
+[data-id],
+*[id^="id-"] {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+}
+
+/* 专门处理ID文本 - 使用通用选择器 */
+.ant-list-item-meta-description,
+.ant-typography,
+.ant-list-item-content,
+.ant-list-item-meta * {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+/* 强制处理文档来源垂直显示的问题 */
+.ant-avatar-string,
+.ant-list-item .ant-list-item-meta .ant-list-item-meta-avatar,
+.ant-list-item .ant-list-item-meta .ant-list-item-meta-title,
+.ant-list-item .ant-list-item-meta .ant-list-item-meta-description,
+.ant-list-item .ant-avatar,
+.ant-card .ant-list-item,
+.ant-card .ant-list-item * {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  text-align: left !important;
+  display: inline-block !important;
+} 

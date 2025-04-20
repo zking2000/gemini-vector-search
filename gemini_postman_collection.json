@@ -1,0 +1,371 @@
+{
+  "info": {
+    "name": "Gemini向量搜索API",
+    "description": "基于Google Gemini模型的向量搜索系统，提供文档管理、向量检索和智能问答功能",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "11111111-2222-3333-4444-555555555555"
+  },
+  "item": [
+    {
+      "name": "系统管理",
+      "description": "系统状态检查和管理操作",
+      "item": [
+        {
+          "name": "检查API健康状态",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://35.246.2.155:8000/api/v1/health",
+              "protocol": "http",
+              "host": ["35", "246", "2", "155"],
+              "port": "8000",
+              "path": ["api", "v1", "health"]
+            },
+            "description": "返回API的健康状态，不需要认证"
+          },
+          "response": []
+        },
+        {
+          "name": "检查数据库状态",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://35.246.2.155:8000/api/v1/database-status",
+              "protocol": "http",
+              "host": ["35", "246", "2", "155"],
+              "port": "8000",
+              "path": ["api", "v1", "database-status"]
+            },
+            "description": "返回数据库连接状态和文档数量，不需要认证"
+          },
+          "response": []
+        },
+        {
+          "name": "清空数据库",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "http://35.246.2.155:8000/api/v1/clear-database?confirmation=confirm_clear",
+              "protocol": "http",
+              "host": ["35", "246", "2", "155"],
+              "port": "8000",
+              "path": ["api", "v1", "clear-database"],
+              "query": [
+                {
+                  "key": "confirmation",
+                  "value": "confirm_clear",
+                  "description": "确认操作的安全检查参数"
+                }
+              ]
+            },
+            "description": "清空数据库中的所有文档和块，需要确认参数"
+          },
+          "response": []
+        },
+        {
+          "name": "清空AlloyDB",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "http://35.246.2.155:8000/api/v1/clear-alloydb?confirmation=confirm_clear_alloydb",
+              "protocol": "http",
+              "host": ["35", "246", "2", "155"],
+              "port": "8000",
+              "path": ["api", "v1", "clear-alloydb"],
+              "query": [
+                {
+                  "key": "confirmation",
+                  "value": "confirm_clear_alloydb"
+                }
+              ]
+            },
+            "description": "清空AlloyDB中的所有数据表"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "文档管理",
+      "description": "文档的添加、查询和删除操作",
+      "item": [
+        {
+          "name": "获取文档列表",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://35.246.2.155:8000/api/v1/documents?limit=50&offset=0&source=",
+              "protocol": "http",
+              "host": ["35", "246", "2", "155"],
+              "port": "8000",
+              "path": ["api", "v1", "documents"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "返回的最大文档数"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "分页偏移量"
+                },
+                {
+                  "key": "source",
+                  "value": "",
+                  "description": "按来源筛选文档"
+                }
+              ]
+            },
+            "description": "获取所有文档的列表"
+          },
+          "response": []
+        },
+        {
+          "name": "添加文档",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"示例文档\",\n  \"content\": \"这是一个示例文档的内容。\",\n  \"source\": \"测试来源\",\n  \"metadata\": {\n    \"author\": \"测试用户\",\n    \"tags\": [\"示例\", \"测试\"]\n  }\n}"
+            },
+            "url": {
+              "raw": "http://35.246.2.155:8000/api/v1/documents",
+              "protocol": "http",
+              "host": ["35", "246", "2", "155"],
+              "port": "8000",
+              "path": ["api", "v1", "documents"]
+            },
+            "description": "添加新文档并生成嵌入向量"
+          },
+          "response": []
+        },
+        {
+          "name": "获取文档详情",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://35.246.2.155:8000/api/v1/documents/{{document_id}}",
+              "protocol": "http",
+              "host": ["35", "246", "2", "155"],
+              "port": "8000",
+              "path": ["api", "v1", "documents", "{{document_id}}"]
+            },
+            "description": "获取单个文档的详细信息"
+          },
+          "response": []
+        },
+        {
+          "name": "删除文档",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://35.246.2.155:8000/api/v1/documents/{{document_id}}",
+              "protocol": "http",
+              "host": ["35", "246", "2", "155"],
+              "port": "8000",
+              "path": ["api", "v1", "documents", "{{document_id}}"]
+            },
+            "description": "删除指定的文档及其所有块"
+          },
+          "response": []
+        },
+        {
+          "name": "上传PDF文件",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "选择PDF文件"
+                },
+                {
+                  "key": "source",
+                  "value": "PDF上传",
+                  "type": "text",
+                  "description": "文档来源"
+                },
+                {
+                  "key": "metadata",
+                  "value": "{\"type\": \"pdf\", \"tags\": [\"上传文档\"]}",
+                  "type": "text",
+                  "description": "JSON格式的元数据"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://35.246.2.155:8000/api/v1/upload-pdf",
+              "protocol": "http",
+              "host": ["35", "246", "2", "155"],
+              "port": "8000",
+              "path": ["api", "v1", "upload-pdf"]
+            },
+            "description": "上传PDF文件并解析其内容"
+          },
+          "response": []
+        },
+        {
+          "name": "分析文档内容",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"document_ids\": [\"文档ID1\", \"文档ID2\"],\n  \"type\": \"summary\"\n}"
+            },
+            "url": {
+              "raw": "http://35.246.2.155:8000/api/v1/analyze-documents",
+              "protocol": "http",
+              "host": ["35", "246", "2", "155"],
+              "port": "8000",
+              "path": ["api", "v1", "analyze-documents"]
+            },
+            "description": "使用Gemini分析文档内容并提供摘要"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "向量和补全API",
+      "description": "向量嵌入生成和文本补全功能",
+      "item": [
+        {
+          "name": "生成文本嵌入向量",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"需要生成嵌入向量的文本内容\"\n}"
+            },
+            "url": {
+              "raw": "http://35.246.2.155:8000/api/v1/embedding",
+              "protocol": "http",
+              "host": ["35", "246", "2", "155"],
+              "port": "8000",
+              "path": ["api", "v1", "embedding"]
+            },
+            "description": "使用Gemini模型生成文本的嵌入向量"
+          },
+          "response": []
+        },
+        {
+          "name": "生成文本补全",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"请解释向量数据库是什么？\",\n  \"use_context\": true,\n  \"context_query\": \"向量数据库\",\n  \"max_context_docs\": 5,\n  \"temperature\": 0.7\n}"
+            },
+            "url": {
+              "raw": "http://35.246.2.155:8000/api/v1/completion",
+              "protocol": "http",
+              "host": ["35", "246", "2", "155"],
+              "port": "8000",
+              "path": ["api", "v1", "completion"]
+            },
+            "description": "使用Gemini模型生成文本补全"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "搜索和问答",
+      "description": "向量搜索和智能问答功能",
+      "item": [
+        {
+          "name": "查询相似文档",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"向量搜索技术\",\n  \"limit\": 10,\n  \"source_filter\": \"\"\n}"
+            },
+            "url": {
+              "raw": "http://35.246.2.155:8000/api/v1/query",
+              "protocol": "http",
+              "host": ["35", "246", "2", "155"],
+              "port": "8000",
+              "path": ["api", "v1", "query"]
+            },
+            "description": "在向量数据库中查询与输入文本相似的文档"
+          },
+          "response": []
+        },
+        {
+          "name": "集成查询",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"谁是道教的创始人？\",\n  \"context_query\": \"道教 创始人\",\n  \"max_context_docs\": 8,\n  \"source_filter\": \"\",\n  \"debug\": true\n}"
+            },
+            "url": {
+              "raw": "http://35.246.2.155:8000/api/v1/integration",
+              "protocol": "http",
+              "host": ["35", "246", "2", "155"],
+              "port": "8000",
+              "path": ["api", "v1", "integration"]
+            },
+            "description": "结合向量搜索和Gemini模型回答问题"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "document_id",
+      "value": "替换为实际的文档ID",
+      "type": "string"
+    }
+  ]
+} 

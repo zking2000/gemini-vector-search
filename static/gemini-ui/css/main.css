@@ -1,0 +1,113 @@
+/* 全局强制水平显示 */
+* {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+}
+
+/* 列表相关元素 */
+.ant-list-item,
+.ant-list-item-meta,
+.ant-list-item-meta-avatar,
+.ant-list-item-meta-title,
+.ant-list-item-meta-description,
+.ant-avatar,
+.ant-avatar-string,
+.document-title,
+.document-meta {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  text-align: left !important;
+  display: block !important;
+}
+
+/* 特殊处理垂直文本 */
+[class*="document-"],
+[class*="ant-"],
+div, span, p, a, h1, h2, h3, h4, h5, h6, button, input, textarea, select {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+}
+
+/* 确保所有文本容器水平显示 */
+.document-reference,
+.document-reference *,
+.message-ai *,
+.reference-item,
+.ant-typography,
+.ant-badge-count {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  display: block !important;
+  text-align: left !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+}
+
+/* 专门处理Badge组件 */
+.ant-badge-count {
+  display: inline-block !important;
+  margin-left: 8px !important;
+}
+
+/* 强制文档片段卡片水平排列 */
+.document-card {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  margin-bottom: 10px !important;
+  padding: 8px !important;
+  background-color: #f9f9f9 !important;
+  border-left: 3px solid #1890ff !important;
+  border-radius: 3px !important;
+}
+
+.document-info {
+  display: flex !important;
+  flex-direction: column !important;
+  flex-grow: 1 !important;
+}
+
+.document-header {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 5px !important;
+  width: 100% !important;
+}
+
+.document-title {
+  font-weight: bold !important;
+  margin-right: 10px !important;
+  display: inline-block !important;
+  text-align: left !important;
+}
+
+.similarity-badge {
+  background-color: #e6f7ff !important;
+  padding: 2px 6px !important;
+  border-radius: 10px !important;
+  font-size: 0.8em !important;
+  white-space: nowrap !important;
+  display: inline-block !important;
+}
+
+/* 全局强制设置 - 应用于所有可能的元素 */
+body .ant-list-item-meta-title,
+body .ant-list-item-meta-description,
+body .ant-typography,
+body [class*="document-"],
+body [class*="message-"] {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+}
+
+/* 特别针对标题显示的修复 */
+.ant-list-item-meta-title * {
+  display: inline-block !important;
+  writing-mode: horizontal-tb !important;
+} 

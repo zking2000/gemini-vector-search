@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini文档浏览器</title>
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #1a73e8;
+            border-bottom: 2px solid #eaecef;
+            padding-bottom: 10px;
+        }
+        .document-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .document-item {
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 15px;
+            transition: box-shadow 0.3s ease;
+        }
+        .document-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .document-title {
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        .document-meta {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+        }
+        .document-meta span {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+        }
+        .error {
+            color: #e74c3c;
+            padding: 20px;
+            background-color: #feeeed;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        button {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #165dbf;
+        }
+        .document-content {
+            margin-top: 10px;
+            background-color: #f6f8fa;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Gemini文档浏览器</h1>
+    <div>
+        <button id="refresh-btn">刷新文档列表</button>
+    </div>
+    <div id="loading" class="loading">加载文档列表中...</div>
+    <div id="error" class="error" style="display: none;"></div>
+    <div id="document-list" class="document-list"></div>
+
+    <script>
+        // API基础URL
+        const API_BASE_URL = window.location.origin;
+        
+        // DOM元素
+        const loadingElement = document.getElementById('loading');
+        const errorElement = document.getElementById('error');
+        const documentListElement = document.getElementById('document-list');
+        const refreshButton = document.getElementById('refresh-btn');
+        
+        // 格式化日期
+        function formatDate(dateString) {
+            if (!dateString) return '未知日期';
+            const date = new Date(dateString);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        // 加载文档列表
+        async function loadDocuments() {
+            loadingElement.style.display = 'block';
+            errorElement.style.display = 'none';
+            documentListElement.innerHTML = '';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/v1/documents`);
+                
+                if (!response.ok) {
+                    throw new Error(`请求失败: ${response.status} ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // 判断返回数据的格式
+                const documents = Array.isArray(data) ? data : (data.documents || []);
+                
+                loadingElement.style.display = 'none';
+                
+                if (documents.length === 0) {
+                    documentListElement.innerHTML = '<div class="error">没有找到文档，请上传新文档。</div>';
+                    return;
+                }
+                
+                // 渲染文档列表
+                documents.forEach(doc => {
+                    const docElement = document.createElement('div');
+                    docElement.className = 'document-item';
+                    
+                    let docTitle = doc.title || '未命名文档';
+                    if (doc.metadata && typeof doc.metadata === 'object' && doc.metadata.source) {
+                        docTitle = doc.metadata.source;
+                    }
+                    
+                    // 添加内容截断逻辑
+                    let content = doc.content || '';
+                    if (content.length > 200) {
+                        content = content.substring(0, 200) + '...';
+                    }
+                    
+                    docElement.innerHTML = `
+                        <div class="document-title">${docTitle}</div>
+                        <div class="document-content">${content}</div>
+                        <div class="document-meta">
+                            <span>文档ID: ${doc.id}</span>
+                            <span>上传时间: ${formatDate(doc.created_at)}</span>
+                            <span>块: ${doc.metadata?.chunk || '未知'} / ${doc.metadata?.total_chunks || '未知'}</span>
+                        </div>
+                    `;
+                    
+                    documentListElement.appendChild(docElement);
+                });
+                
+            } catch (error) {
+                loadingElement.style.display = 'none';
+                errorElement.textContent = `加载文档失败: ${error.message}`;
+                errorElement.style.display = 'block';
+            }
+        }
+        
+        // 事件绑定
+        refreshButton.addEventListener('click', loadDocuments);
+        
+        // 初始加载
+        document.addEventListener('DOMContentLoaded', loadDocuments);
+    </script>
+</body>
+</html> 
