@@ -127,6 +127,14 @@ start_backend() {
         fi
     fi
 
+    # 检查Gemini API配额
+    echo -e "${BLUE}正在检查Gemini API配额信息...${NC}"
+    if [ -f "./scripts/check_gemini_quota.py" ]; then
+        python ./scripts/check_gemini_quota.py | tee -a $BACKEND_LOG
+    else
+        echo -e "${RED}未找到Gemini API配额检查脚本${NC}" | tee -a $BACKEND_LOG
+    fi
+    
     # Add start time information at the beginning of the log file
     echo "===== Backend service started at $(date) =====" > $BACKEND_LOG
     

@@ -71,6 +71,38 @@ async def lifespan(app: FastAPI):
         logger.info(f"Google Cloud Project: {project_id}")
         logger.info(f"API Key configured: {api_configured}")
         
+        # 检查API配额状态
+        try:
+            logger.info("=== 检查Gemini API配额状态 ===")
+            # 尝试发送一个简单的请求，检查配额状态
+            try:
+                if gemini_service.model_id:
+                    test_model = genai.GenerativeModel(gemini_service.model_id)
+                else:
+                    test_model = genai.GenerativeModel("gemini-1.5-pro")
+                    
+                # 发送一个简单的请求
+                response = test_model.generate_content("测试API配额")
+                logger.info("API配额状态: 正常 - 成功完成测试请求")
+                logger.info(f"剩余配额: Google AI API目前不直接提供查询剩余配额的接口")
+                logger.info(f"配额限制: 大多数Gemini模型的默认配额是每分钟60次请求，每天大约1000-1500次请求")
+            except Exception as quota_err:
+                error_message = str(quota_err)
+                logger.warning(f"API配额测试请求失败: {error_message}")
+                
+                # 检查是否是配额相关的错误
+                if "429" in error_message or "quota" in error_message.lower() or "resource exhausted" in error_message.lower():
+                    logger.warning("API配额状态: 配额可能已用尽或接近上限")
+                    # 提取错误消息中的配额信息
+                    if "limit" in error_message and "quota" in error_message:
+                        parts = error_message.split("quota")
+                        if len(parts) > 1:
+                            logger.warning(f"配额详情: {parts[1]}")
+                else:
+                    logger.warning("API配额状态: 未知 - 请求失败但不是由于配额限制")
+        except Exception as quota_check_err:
+            logger.error(f"检查API配额状态时出错: {quota_check_err}")
+        
         # 打印高级功能支持
         logger.info(f"Advanced features: Thinking Budget, Model Complexity Selection, Response Caching")
     except Exception as e:

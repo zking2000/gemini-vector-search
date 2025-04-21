@@ -47,7 +47,7 @@ If the question is about the founder of Buddhism, pay special attention to conte
     }
     
     def __init__(self):
-        self.model_id = "gemini-2.5-pro-exp-03-25"
+        self.model_id = "gemini-2.5-pro-preview-03-25"
         self.embedding_model_name = "models/gemini-embedding-exp-03-07"  # Updated to correct model name format
         # Add simple embedding cache to avoid repeated calculations
         self.embedding_cache = {}
