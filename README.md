@@ -190,58 +190,6 @@ graph TD
 
 ## Code Structure Detailed Diagram
 
-### Data Model Relationship Diagram
-
-```mermaid
-classDiagram
-    class VectorDocument {
-        +String id
-        +String content
-        +String source_name
-        +String metadata
-        +List~Float~ embedding
-        +DateTime created_at
-        +insertDocument()
-        +findSimilar()
-        +deleteDocuments()
-    }
-    
-    class APIRequest {
-        +String prompt
-        +String context_query
-        +int max_context_docs
-        +String source_filter
-        +bool debug
-        +validate()
-    }
-    
-    class APIResponse {
-        +String completion
-        +DebugInfo debug_info
-        +toJSON()
-    }
-    
-    class DebugInfo {
-        +String original_query
-        +String search_query
-        +int docs_found
-        +int context_length
-        +List~String~ document_snippets
-    }
-    
-    class CacheEntry {
-        +String key
-        +Any value
-        +DateTime expiry
-        +bool isExpired()
-    }
-    
-    APIRequest --> APIResponse : Generate
-    APIResponse *-- DebugInfo : Contains
-    APIRequest --> VectorDocument : Query
-    VectorDocument --> VectorDocument : Similar Matching
-```
-
 ### Query Processing Flow
 
 ```mermaid
