@@ -194,7 +194,25 @@ async def add_document(
     """
     try:
         document = await vector_service.add_document(db, request.content, request.metadata)
-        return document
+        
+        # 手动创建返回对象，确保符合DocumentResponse模型的要求
+        # 从文档元数据中获取并解析元数据
+        metadata = {}
+        if document.doc_metadata:
+            try:
+                import json
+                metadata_dict = json.loads(document.doc_metadata)
+                # 排除内部字段如_embedding
+                metadata = {k: v for k, v in metadata_dict.items() if not k.startswith('_')}
+            except Exception as e:
+                print(f"无法解析文档元数据: {e}")
+        
+        # 创建符合DocumentResponse的字典
+        return {
+            "id": document.id,
+            "content": request.content,  # 使用请求中的内容，因为数据库中可能没有存储
+            "metadata": metadata
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to add document: {str(e)}")
 
@@ -484,7 +502,7 @@ User question: {request.prompt}
         raise HTTPException(status_code=500, detail=f"Integration query failed: {str(e)}")
 
 @router.get("/documents", 
-           response_model=List[Dict[str, Any]], 
+           response_model=Dict[str, Any], 
            summary="Get Document List", 
            description="Get document list, supports paging and source filtering",
            response_description="Returns document list")
@@ -506,7 +524,7 @@ async def get_documents(
         source: Filter by document source, for example specific PDF file name
         
     Returns:
-        List[Dict]: Document list, each document contains ID, title, content, metadata, and creation time
+        Dict: Dictionary containing document list and total count
         
     Exceptions:
         HTTPException: If failed to get document list
@@ -514,10 +532,12 @@ async def get_documents(
     try:
         # Build query conditions
         query = "SELECT id, title, doc_metadata, created_at FROM documents"
+        count_query = "SELECT COUNT(*) FROM documents"
         params = {}
         
         if source:
             query += " WHERE doc_metadata::text LIKE :source"
+            count_query += " WHERE doc_metadata::text LIKE :source"
             params["source"] = f"%{source}%"
             
         # Add sorting and paging
@@ -527,6 +547,11 @@ async def get_documents(
         
         # Execute query
         result = db.execute(text(query), params).fetchall()
+        
+        # Get total count
+        total_count = db.execute(text(count_query), 
+                               {k:v for k,v in params.items() if k != 'limit' and k != 'offset'}
+                              ).scalar() or 0
         
         # Process results
         documents = []
@@ -561,7 +586,11 @@ async def get_documents(
                 "created_at": row.created_at.isoformat() if row.created_at else None
             })
             
-        return documents
+        # 返回符合API规范的响应，包含documents列表和total总数
+        return {
+            "documents": documents,
+            "total": total_count
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get document list: {str(e)}")
 
@@ -968,4 +997,56 @@ async def get_document(document_id: int = Path(..., description="Document ID"), 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get document: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to get document: {str(e)}")
+
+@router.delete("/documents/{document_id}", 
+             response_model=Dict[str, Any], 
+             summary="Delete Document", 
+             description="Delete specified document from the database",
+             response_description="Returns status of the deletion operation")
+async def delete_document(document_id: int = Path(..., description="Document ID"), db: Session = Depends(get_db)):
+    """
+    Delete document by ID
+    
+    Delete a document and its metadata from the database
+    
+    Parameters:
+        document_id: Document's unique identifier
+        db: Database session
+        
+    Returns:
+        Dict: Status information about the deletion operation
+        
+    Exceptions:
+        HTTPException: If document does not exist or deletion fails
+    """
+    try:
+        # Check if document exists
+        check_result = db.execute(
+            text("SELECT id FROM documents WHERE id::text = :id"),
+            {"id": str(document_id)}
+        ).fetchone()
+        
+        if not check_result:
+            raise HTTPException(status_code=404, detail=f"No document found with ID {document_id}")
+        
+        # Delete document
+        delete_result = db.execute(
+            text("DELETE FROM documents WHERE id::text = :id"),
+            {"id": str(document_id)}
+        )
+        
+        # Commit the transaction
+        db.commit()
+        
+        # Return success status
+        return {
+            "status": "success",
+            "message": f"Document {document_id} deleted successfully",
+            "deleted_records": delete_result.rowcount
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()  # 确保在发生错误时回滚事务
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}") 
