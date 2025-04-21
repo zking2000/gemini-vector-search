@@ -13,6 +13,7 @@ import pytest
 import requests
 import tempfile
 import io
+import logging
 from dotenv import load_dotenv
 
 # 确保从项目根目录导入
@@ -24,6 +25,7 @@ load_dotenv()
 # 测试配置
 # 优先使用脚本通过TEST_开头的环境变量传递的设置
 BASE_URL = os.getenv('TEST_API_BASE_URL') or f"http://{os.getenv('HOST', '0.0.0.0')}:{os.getenv('PORT', '8000')}/api/v1"
+logging.info(f"使用API基础URL: {BASE_URL}")
 print(f"使用API基础URL: {BASE_URL}")
 
 TEST_DOCUMENT = {
@@ -50,6 +52,7 @@ class TestGeminiVectorSearchAPI:
     @classmethod
     def setup_class(cls):
         """测试类初始化"""
+        logging.info(f"\n测试服务地址: {BASE_URL}")
         print(f"\n测试服务地址: {BASE_URL}")
         cls.check_api_health()
     
@@ -61,8 +64,10 @@ class TestGeminiVectorSearchAPI:
                 # 创建临时实例来调用实例方法
                 instance = cls()
                 instance.delete_document(doc_id)
+                logging.info(f"已清理测试文档 ID: {doc_id}")
                 print(f"已清理测试文档 ID: {doc_id}")
             except Exception as e:
+                logging.error(f"清理文档失败 ID: {doc_id}, 错误: {e}")
                 print(f"清理文档失败 ID: {doc_id}, 错误: {e}")
     
     @classmethod
@@ -71,6 +76,7 @@ class TestGeminiVectorSearchAPI:
         response = requests.get(f"{BASE_URL}/health")
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
+        logging.info("API健康状态检查通过")
         print("API健康状态检查通过")
     
     # --- 系统管理API测试 ---
@@ -80,6 +86,7 @@ class TestGeminiVectorSearchAPI:
         response = requests.get(f"{BASE_URL}/health")
         assert response.status_code == 200
         assert "status" in response.json()
+        logging.info("健康检查API测试通过")
         print("健康检查API测试通过")
     
     def test_02_database_status(self):
@@ -89,6 +96,7 @@ class TestGeminiVectorSearchAPI:
         data = response.json()
         assert "status" in data
         assert data["status"] == "connected"
+        logging.info("数据库状态API测试通过")
         print("数据库状态API测试通过")
     
     # --- 嵌入向量API测试 ---
@@ -104,6 +112,7 @@ class TestGeminiVectorSearchAPI:
         assert len(data["embedding"]) > 0
         # 保存嵌入向量用于后续测试
         self.__class__.test_embedding = data["embedding"]
+        logging.info("嵌入向量生成API测试通过")
         print("嵌入向量生成API测试通过")
     
     # --- 文档管理API测试 ---
@@ -116,6 +125,7 @@ class TestGeminiVectorSearchAPI:
         assert "id" in data
         # 保存文档ID用于后续测试
         self.__class__.document_ids.append(data["id"])
+        logging.info(f"文档添加API测试通过，文档ID: {data['id']}")
         print(f"文档添加API测试通过，文档ID: {data['id']}")
     
     def test_05_get_document_list(self):
@@ -126,6 +136,7 @@ class TestGeminiVectorSearchAPI:
         assert "documents" in data
         assert isinstance(data["documents"], list)
         assert "total" in data
+        logging.info(f"获取文档列表API测试通过，共 {data['total']} 个文档")
         print(f"获取文档列表API测试通过，共 {data['total']} 个文档")
     
     def test_06_get_document_by_id(self):
@@ -140,6 +151,7 @@ class TestGeminiVectorSearchAPI:
         assert "id" in data
         assert data["id"] == doc_id
         assert "content" in data
+        logging.info(f"通过ID获取文档API测试通过，文档ID: {doc_id}")
         print(f"通过ID获取文档API测试通过，文档ID: {doc_id}")
     
     # --- PDF上传API测试 ---
@@ -166,6 +178,7 @@ class TestGeminiVectorSearchAPI:
             assert result["document_id"], "Document ID should not be empty"
             # 保存PDF文档ID
             self.__class__.document_ids.append(result["document_id"])
+            logging.info(f"PDF上传API测试通过，文档ID: {result['document_id']}")
             print(f"PDF上传API测试通过，文档ID: {result['document_id']}")
         elif "document_ids" in result:
             assert result["document_ids"], "Document IDs list should not be empty"
@@ -174,6 +187,7 @@ class TestGeminiVectorSearchAPI:
                 self.__class__.document_ids.extend(result["document_ids"])
             else:
                 self.__class__.document_ids.append(result["document_ids"])
+            logging.info(f"PDF上传API测试通过，文档ID列表: {result['document_ids']}")
             print(f"PDF上传API测试通过，文档ID列表: {result['document_ids']}")
         else:
             assert False, f"API响应中既没有document_id也没有document_ids字段: {result}"
@@ -195,6 +209,7 @@ class TestGeminiVectorSearchAPI:
         assert response.status_code == 200
         data = response.json()
         assert "results" in data
+        logging.info(f"查询相似文档API测试通过，找到 {len(data['results'])} 个结果")
         print(f"查询相似文档API测试通过，找到 {len(data['results'])} 个结果")
     
     # --- 文本生成API测试 ---
@@ -216,6 +231,7 @@ class TestGeminiVectorSearchAPI:
         assert "completion" in data
         assert isinstance(data["completion"], str)
         assert len(data["completion"]) > 0
+        logging.info("文本生成API测试通过")
         print("文本生成API测试通过")
     
     # --- 集成查询API测试 ---
@@ -240,6 +256,7 @@ class TestGeminiVectorSearchAPI:
         
         # 检查debug信息
         assert "debug_info" in data, "返回数据不包含debug_info字段"
+        logging.info("集成查询API测试通过")
         print("集成查询API测试通过")
     
     # --- 文档分析API测试 ---
@@ -262,16 +279,20 @@ class TestGeminiVectorSearchAPI:
             
             # 检查响应状态码，允许失败但记录
             if response.status_code == 200:
+                logging.info("文档分析API测试通过")
                 print("文档分析API测试通过")
                 return
             
             # 如果状态码不是200，尝试分析错误
+            logging.warning(f"文档分析API返回非200状态码: {response.status_code}")
+            logging.warning(f"响应内容: {response.text[:300]}")
             print(f"文档分析API返回非200状态码: {response.status_code}")
             print(f"响应内容: {response.text[:300]}")
             
             # 将这个测试标记为xfail，表示"预期失败"
             pytest.xfail("文档分析API测试失败，但这不影响其他测试")
         except Exception as e:
+            logging.error(f"文档分析API测试出现异常: {str(e)}")
             print(f"文档分析API测试出现异常: {str(e)}")
             pytest.xfail("文档分析API测试异常，但这不影响其他测试")
     
@@ -290,6 +311,7 @@ class TestGeminiVectorSearchAPI:
             assert response.status_code == 200
             data = response.json()
             assert "completion" in data
+            logging.info(f"{complexity}复杂度模型测试通过")
             print(f"{complexity}复杂度模型测试通过")
     
     def test_13_chinese_query(self):
@@ -306,6 +328,7 @@ class TestGeminiVectorSearchAPI:
         assert "completion" in data
         # 检查返回是否包含中文
         assert any('\u4e00' <= c <= '\u9fff' for c in data["completion"])
+        logging.info("中文查询测试通过")
         print("中文查询测试通过")
     
     # --- 清理操作测试 ---
@@ -327,6 +350,7 @@ class TestGeminiVectorSearchAPI:
         assert "status" in result
         # 从列表中移除已删除的ID
         self.__class__.document_ids.remove(doc_id)
+        logging.info(f"删除文档API测试通过，文档ID: {doc_id}")
         print(f"删除文档API测试通过，文档ID: {doc_id}")
 
 
