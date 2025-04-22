@@ -163,11 +163,13 @@ const QueryAssistant = () => {
 
         <div
           style={{
-            maxWidth: '80%',
+            maxWidth: '70%',
             padding: 16,
             borderRadius: 8,
             backgroundColor: isUser ? '#e6f7ff' : '#f6ffed',
             textAlign: isUser ? 'right' : 'left',
+            wordWrap: 'break-word',
+            overflowWrap: 'break-word',
           }}
         >
           <Paragraph 
@@ -178,7 +180,7 @@ const QueryAssistant = () => {
         </div>
 
         {message.contextDocuments && message.contextDocuments.length > 0 && (
-          <div style={{ marginTop: 8, maxWidth: '80%' }} className="document-reference">
+          <div style={{ marginTop: 8, maxWidth: '70%', overflowWrap: 'break-word', wordWrap: 'break-word' }} className="document-reference">
             <Text type="secondary" style={{ fontSize: 12, writingMode: 'horizontal-tb', display: 'block' }}>
               <InfoCircleOutlined /> 参考文档:
             </Text>
@@ -190,7 +192,9 @@ const QueryAssistant = () => {
                   style={{
                     display: 'block',
                     writingMode: 'horizontal-tb',
-                    textOrientation: 'mixed'
+                    textOrientation: 'mixed',
+                    wordWrap: 'break-word',
+                    overflowWrap: 'break-word'
                   }}
                 >
                   <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', writingMode: 'horizontal-tb' }}>
@@ -206,7 +210,7 @@ const QueryAssistant = () => {
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           marginRight: '8px',
-                          maxWidth: '200px',
+                          maxWidth: '150px',
                           whiteSpace: 'nowrap'
                         }}>
                           {doc.source || (doc.metadata?.source || doc.metadata?.pdf_filename || `文档片段 #${index+1}`)}
@@ -251,7 +255,13 @@ const QueryAssistant = () => {
   };
 
   return (
-    <div className="query-assistant-container">
+    <div className="query-assistant-container" style={{ 
+      position: 'relative',
+      minHeight: '100%',
+      width: '100%',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
       <Card 
         title={<Title level={4}>智能查询助手</Title>}
         extra={
@@ -264,10 +274,30 @@ const QueryAssistant = () => {
           </Button>
         }
         bordered={false}
-        style={{ width: '100%', height: 'calc(100vh - 160px)' }}
+        style={{ 
+          width: '100%', 
+          height: 'auto',
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'auto'
+        }}
+        bodyStyle={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
       >
-        <div style={{ marginBottom: 16 }}>
-          <Space align="center" style={{ marginBottom: 16 }}>
+        <div style={{ 
+          marginBottom: 16,
+          flexWrap: 'wrap',
+          display: 'flex'
+        }}>
+          <Space align="center" style={{ 
+            marginBottom: 16,
+            flexWrap: 'wrap'
+          }}>
             <Select
               style={{ width: 200 }}
               value={selectedSource}
@@ -316,13 +346,16 @@ const QueryAssistant = () => {
 
         <div
           style={{
-            height: 'calc(100vh - 380px)',
-            minHeight: '300px',
+            height: 'auto',
+            flex: 1,
             overflowY: 'auto',
             padding: '0 12px',
             border: '1px solid #f0f0f0',
             borderRadius: 6,
             backgroundColor: '#fafafa',
+            position: 'relative',
+            width: '100%',
+            marginBottom: '16px'
           }}
         >
           {conversations.length > 0 ? (
@@ -347,6 +380,9 @@ const QueryAssistant = () => {
           style={{
             display: 'flex',
             alignItems: 'flex-end',
+            marginTop: '16px',
+            width: '100%',
+            position: 'relative'
           }}
         >
           <TextArea
@@ -371,6 +407,7 @@ const QueryAssistant = () => {
               height: '54px',
               borderRadius: '0 8px 8px 0',
               width: '50px',
+              flexShrink: 0
             }}
             disabled={!prompt.trim()}
           />

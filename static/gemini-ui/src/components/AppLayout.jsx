@@ -40,10 +40,10 @@ const AppLayout = () => {
   const getSelectedKey = () => {
     const path = location.pathname;
     if (path === '/') return '1';
+    if (path.includes('/assistant')) return '5';
+    if (path.includes('/upload')) return '4';
     if (path.includes('/documents')) return '2';
     if (path.includes('/search')) return '3';
-    if (path.includes('/upload')) return '4';
-    if (path.includes('/assistant')) return '5';
     return '1';
   };
 
@@ -96,6 +96,16 @@ const AppLayout = () => {
               label: <Link to="/">{t('nav.home')}</Link>,
             },
             {
+              key: '5',
+              icon: <QuestionCircleOutlined />,
+              label: <Link to="/assistant">{t('nav.queryAssistant')}</Link>,
+            },
+            {
+              key: '4',
+              icon: <UploadOutlined />,
+              label: <Link to="/upload">{t('nav.uploadDocument')}</Link>,
+            },
+            {
               key: '2',
               icon: <DatabaseOutlined />,
               label: <Link to="/documents">{t('nav.documentList')}</Link>,
@@ -104,16 +114,6 @@ const AppLayout = () => {
               key: '3',
               icon: <FileSearchOutlined />,
               label: <Link to="/search">{t('nav.documentSearch')}</Link>,
-            },
-            {
-              key: '4',
-              icon: <UploadOutlined />,
-              label: <Link to="/upload">{t('nav.uploadDocument')}</Link>,
-            },
-            {
-              key: '5',
-              icon: <QuestionCircleOutlined />,
-              label: <Link to="/assistant">{t('nav.queryAssistant')}</Link>,
             },
           ]}
         />

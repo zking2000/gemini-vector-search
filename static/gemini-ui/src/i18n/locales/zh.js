@@ -28,7 +28,7 @@ export default {
     rememberMe: '记住我',
     loginButton: '登录',
     welcomeBack: '欢迎回来',
-    loginTitle: 'Gemini向量搜索平台',
+    loginTitle: 'Smart RAG Platform',
     loginSubtitle: '请输入您的账号信息',
     invalidCredentials: '用户名或密码错误',
     logoutConfirm: '确定要退出登录吗？',
@@ -41,15 +41,15 @@ export default {
   // 导航菜单
   nav: {
     home: '首页',
+    queryAssistant: '智能问答',
+    uploadDocument: '上传文档',
     documentList: '文档列表',
     documentSearch: '文档搜索',
-    uploadDocument: '上传文档',
-    queryAssistant: '智能问答',
   },
   
   // 首页
   home: {
-    title: 'Gemini向量搜索平台',
+    title: 'Smart RAG Platform',
     subtitle: '基于Google Gemini 2.0 Flash模型的智能文档检索与问答系统',
     statsDocuments: '文档总数',
     statsChunks: '文本块总数',
@@ -150,6 +150,6 @@ export default {
   
   // 页脚
   footer: {
-    copyright: 'Gemini向量搜索平台 ©{year} 由Google Gemini 2.0提供支持',
+    copyright: 'Smart RAG Platform ©{year} 由Google Gemini 2.0提供支持',
   }
 }; 

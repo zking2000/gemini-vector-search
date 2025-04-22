@@ -4,7 +4,8 @@ import {
   FileTextOutlined, 
   SearchOutlined, 
   DatabaseOutlined, 
-  RobotOutlined 
+  RobotOutlined,
+  UploadOutlined 
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -84,26 +85,6 @@ const Home = () => {
 
       <div style={{ marginTop: 40 }}>
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={12}>
-            <Card 
-              title={t('home.cardSearchTitle')} 
-              bordered={false} 
-              hoverable 
-              extra={<Link to="/search"><Button type="primary" icon={<SearchOutlined />}>{t('home.cardSearchBtn')}</Button></Link>}
-            >
-              <p>{t('home.cardSearchDesc')}</p>
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={12}>
-            <Card 
-              title={t('home.cardUploadTitle')} 
-              bordered={false} 
-              hoverable 
-              extra={<Link to="/upload"><Button type="primary" icon={<SearchOutlined />}>{t('home.cardUploadBtn')}</Button></Link>}
-            >
-              <p>{t('home.cardUploadDesc')}</p>
-            </Card>
-          </Col>
           <Col xs={24} md={24}>
             <Card 
               title={t('home.cardAssistantTitle')} 
@@ -112,6 +93,26 @@ const Home = () => {
               extra={<Link to="/assistant"><Button type="primary" icon={<RobotOutlined />}>{t('home.cardAssistantBtn')}</Button></Link>}
             >
               <p>{t('home.cardAssistantDesc')}</p>
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={12}>
+            <Card 
+              title={t('home.cardUploadTitle')} 
+              bordered={false} 
+              hoverable 
+              extra={<Link to="/upload"><Button type="primary" icon={<UploadOutlined />}>{t('home.cardUploadBtn')}</Button></Link>}
+            >
+              <p>{t('home.cardUploadDesc')}</p>
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={12}>
+            <Card 
+              title={t('home.cardSearchTitle')} 
+              bordered={false} 
+              hoverable 
+              extra={<Link to="/search"><Button type="primary" icon={<SearchOutlined />}>{t('home.cardSearchBtn')}</Button></Link>}
+            >
+              <p>{t('home.cardSearchDesc')}</p>
             </Card>
           </Col>
         </Row>

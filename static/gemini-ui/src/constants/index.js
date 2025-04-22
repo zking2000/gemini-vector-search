@@ -34,7 +34,7 @@ export const ROUTES = {
 // 默认值
 export const DEFAULTS = {
   API_BASE_URL: 'http://localhost:8000',
-  APP_TITLE: 'Gemini向量搜索平台',
+  APP_TITLE: 'Smart RAG Platform',
   CREDENTIALS: {
     admin: 'Pa$$w0rd',
     user1: '123456',

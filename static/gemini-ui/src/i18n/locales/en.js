@@ -28,7 +28,7 @@ export default {
     rememberMe: 'Remember me',
     loginButton: 'Login',
     welcomeBack: 'Welcome Back',
-    loginTitle: 'Gemini Vector Search Platform',
+    loginTitle: 'Smart RAG Platform',
     loginSubtitle: 'Please enter your credentials',
     invalidCredentials: 'Invalid username or password',
     logoutConfirm: 'Are you sure you want to log out?',
@@ -41,15 +41,15 @@ export default {
   // Navigation
   nav: {
     home: 'Home',
+    queryAssistant: 'AI Assistant',
+    uploadDocument: 'Upload Document',
     documentList: 'Document List',
     documentSearch: 'Document Search',
-    uploadDocument: 'Upload Document',
-    queryAssistant: 'AI Assistant',
   },
   
   // Home page
   home: {
-    title: 'Gemini Vector Search Platform',
+    title: 'Smart RAG Platform',
     subtitle: 'Intelligent document retrieval and Q&A system based on Google Gemini 2.0 Flash model',
     statsDocuments: 'Total Documents',
     statsChunks: 'Total Text Chunks',
@@ -150,6 +150,6 @@ export default {
   
   // Footer
   footer: {
-    copyright: 'Gemini Vector Search Platform ©{year} Powered by Google Gemini 2.0',
+    copyright: 'Smart RAG Platform ©{year} Powered by Google Gemini 2.0',
   }
 }; 
