@@ -652,16 +652,44 @@ class VectorService:
                 
                 for doc in db_results:
                     # 计算相似度分数
-                    similarity = self.cosine_similarity(query_embedding, doc.get("embedding", []))
-                    total_similarity += similarity
-                    
-                    document = {
-                        "id": doc.get("id"),
-                        "content": doc.get("content", "").strip(),
-                        "score": similarity,
-                        "metadata": doc.get("metadata", {})
-                    }
-                    documents.append(document)
+                    # 修复：从doc_metadata中提取embedding，而不是直接使用doc.get("embedding", [])
+                    # 先尝试获取_embedding字段
+                    try:
+                        # 从元数据中获取embedding
+                        doc_metadata = doc.get("metadata", {})
+                        if not doc_metadata and isinstance(doc.get("doc_metadata"), str):
+                            try:
+                                doc_metadata = json.loads(doc.get("doc_metadata", "{}"))
+                            except json.JSONDecodeError:
+                                print(f"无法解析文档 {doc.get('id')} 的元数据JSON")
+                                doc_metadata = {}
+                                
+                        # 尝试从元数据中获取embedding
+                        doc_embedding = None
+                        if "_embedding" in doc_metadata:
+                            doc_embedding = doc_metadata.get("_embedding")
+                        else:
+                            # search_documents_by_strategy可能会将embedding放在不同位置
+                            doc_embedding = doc.get("embedding", [])
+                        
+                        if not doc_embedding:
+                            print(f"文档 {doc.get('id')} 没有embedding向量")
+                            continue
+                            
+                        # 计算相似度
+                        similarity = self.cosine_similarity(query_embedding, doc_embedding)
+                        total_similarity += similarity
+                        
+                        document = {
+                            "id": doc.get("id"),
+                            "content": doc.get("content", "").strip(),
+                            "score": similarity,
+                            "metadata": doc.get("metadata", {})
+                        }
+                        documents.append(document)
+                    except Exception as e:
+                        print(f"处理文档 {doc.get('id')} 时出错: {str(e)}")
+                        continue
                 
                 # 计算平均相似度
                 avg_similarity = total_similarity / len(documents) if documents else 0
