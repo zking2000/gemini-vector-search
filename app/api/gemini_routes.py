@@ -736,6 +736,56 @@ async def upload_pdf(
     Returns:
         包含提取文本的JSON响应
     """
+    # 检查文件类型
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="只接受PDF文件")
+    
+    # 调用通用文件上传处理函数
+    return await upload_file(
+        file=file,
+        preserve_tables=preserve_tables,
+        use_ocr=use_ocr,
+        chunking_strategy=chunking_strategy,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        save_to_database=save_to_database,
+        db=db,
+        vector_service=vector_service,
+        x_chunking_strategy=x_chunking_strategy
+    )
+
+@router.post("/upload_file", 
+            response_model=Dict[str, Any], 
+            summary="上传和处理各种文件", 
+            description="上传各种文件(PDF、TXT、DOCX、CSV等)，解析内容并存储到向量数据库，支持智能分块",
+            response_description="返回处理结果，包括文件名、处理的区块数量和文档ID列表")
+async def upload_file(
+    file: UploadFile = File(...),
+    preserve_tables: bool = True,
+    use_ocr: bool = False,
+    chunking_strategy: str = Query("auto", description="分块策略: 'fixed_size', 'intelligent' 或 'auto'"),
+    chunk_size: int = Query(1000, description="固定分块尺寸"),
+    chunk_overlap: int = Query(200, description="固定分块重叠大小"),
+    save_to_database: bool = Query(True, description="是否保存到数据库"),
+    db: Session = Depends(get_db),
+    vector_service: VectorService = Depends(get_vector_service),
+    x_chunking_strategy: Optional[str] = Header(None, description="分块策略的header参数")
+):
+    """上传和处理各种文件
+
+    Args:
+        file: 要上传的文件（支持PDF、TXT、DOCX、CSV等）
+        preserve_tables: 保留表格结构，默认为True
+        use_ocr: 是否使用OCR处理扫描文档，默认为False
+        chunking_strategy: 分块策略，可选 'fixed_size', 'intelligent' 或 'auto'
+        chunk_size: 固定分块尺寸，默认1000
+        chunk_overlap: 固定分块重叠大小，默认200
+        save_to_database: 是否保存到数据库，默认True
+        x_chunking_strategy: Header中指定的分块策略，优先级高于查询参数
+
+    Returns:
+        包含提取文本的JSON响应
+    """
     # 如果header中提供了chunking_strategy，则覆盖查询参数
     if x_chunking_strategy:
         chunking_strategy = x_chunking_strategy
@@ -748,24 +798,29 @@ async def upload_pdf(
     
     print(f"使用分块策略: {chunking_strategy}, 保存到数据库: {save_to_database}")
     
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="只接受PDF文件")
-
+    # 检查文件类型
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    print(f"上传文件: {file.filename}, 扩展名: {file_ext}")
+    
+    # 获取文件MIME类型
+    mime_type = file.content_type or ""
+    print(f"文件MIME类型: {mime_type}")
+    
+    # 保存上传的文件到临时目录
+    temp_file_path = f"/tmp/{uuid.uuid4()}{file_ext}"
+    content = await file.read()
+    
+    with open(temp_file_path, "wb") as f:
+        f.write(content)
+    
+    extracted_text = ""
     try:
-        # 保存上传的文件到临时目录
-        temp_file_path = f"/tmp/{uuid.uuid4()}.pdf"
-        content = await file.read()
-        
-        # 检查PDF文件的有效性
-        if len(content) < 4 or content[:4] != b'%PDF':
-            raise HTTPException(status_code=400, detail="无效的PDF文件格式")
-            
-        with open(temp_file_path, "wb") as f:
-            f.write(content)
-        
-        extracted_text = ""
-        
-        try:
+        # 根据文件类型处理文件
+        if file_ext == '.pdf':
+            # PDF文件处理
+            if len(content) < 4 or content[:4] != b'%PDF':
+                raise HTTPException(status_code=400, detail="无效的PDF文件格式")
+                
             # 使用异常处理捕获PDF读取错误
             try:
                 # 首先尝试使用PyPDF2提取文本（基本提取）
@@ -846,25 +901,159 @@ async def upload_pdf(
                 # 这里可以添加OCR处理代码
                 pass
                 
-        finally:
-            # 清理临时文件
+        elif file_ext == '.txt':
+            # 文本文件处理
+            with open(temp_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                extracted_text = f.read()
+                
+        elif file_ext == '.csv':
+            # CSV文件处理
             try:
-                os.remove(temp_file_path)
-            except:
-                pass
+                import pandas as pd
+                df = pd.read_csv(temp_file_path)
+                # 转换为文本格式，保留表格结构
+                extracted_text = df.to_string(index=False)
+            except Exception as e:
+                print(f"处理CSV文件时出错: {e}")
+                # 尝试使用基本方法读取
+                with open(temp_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    extracted_text = f.read()
+                
+        elif file_ext in ['.docx', '.doc']:
+            # Word文档处理
+            try:
+                from docx import Document
+                doc = Document(temp_file_path)
+                paragraphs = [p.text for p in doc.paragraphs]
+                extracted_text = '\n\n'.join(paragraphs)
+                
+                # 如果需要保留表格
+                if preserve_tables and doc.tables:
+                    extracted_text += "\n\n"
+                    for table in doc.tables:
+                        extracted_text += "<TABLE>\n"
+                        for row in table.rows:
+                            row_text = '\t'.join(cell.text for cell in row.cells)
+                            extracted_text += row_text + '\n'
+                        extracted_text += "</TABLE>\n\n"
+            except Exception as e:
+                print(f"处理Word文档时出错: {e}")
+                raise HTTPException(status_code=400, detail=f"无法处理Word文档: {str(e)}")
+                
+        elif file_ext == '.xlsx' or file_ext == '.xls':
+            # Excel文件处理
+            try:
+                import pandas as pd
+                # 读取所有工作表
+                excel_file = pd.ExcelFile(temp_file_path)
+                sheet_texts = []
+                
+                for sheet_name in excel_file.sheet_names:
+                    df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                    sheet_text = f"工作表: {sheet_name}\n"
+                    sheet_text += "<TABLE>\n"
+                    sheet_text += df.to_string(index=False)
+                    sheet_text += "\n</TABLE>\n\n"
+                    sheet_texts.append(sheet_text)
+                
+                extracted_text = '\n\n'.join(sheet_texts)
+            except Exception as e:
+                print(f"处理Excel文件时出错: {e}")
+                raise HTTPException(status_code=400, detail=f"无法处理Excel文件: {str(e)}")
+                
+        else:
+            # 尝试作为纯文本文件处理
+            try:
+                with open(temp_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    extracted_text = f.read()
+                print(f"未知文件类型 {file_ext}，尝试作为纯文本处理")
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"不支持的文件类型 {file_ext}: {str(e)}")
+    
+    finally:
+        # 清理临时文件
+        try:
+            os.remove(temp_file_path)
+        except:
+            pass
+    
+    if not extracted_text.strip():
+        raise HTTPException(status_code=400, detail="无法从文件提取文本")
         
-        if not extracted_text.strip():
-            raise HTTPException(status_code=400, detail="无法从PDF提取文本")
+    # 分块处理文本
+    MAX_CHUNK_SIZE = 30000  # 约30k字符
+    chunks = []
+    document_ids = []
+    
+    # 根据策略选择分块方法
+    if chunking_strategy == "fixed_size":
+        # 固定大小分块
+        if len(extracted_text) > chunk_size:
+            paragraphs = re.split(r'\n\s*\n', extracted_text)
+            current_chunk = ""
             
-        # 分块处理文本
-        MAX_CHUNK_SIZE = 30000  # 约30k字符
-        chunks = []
-        document_ids = []
-        
-        # 根据策略选择分块方法
-        if chunking_strategy == "fixed_size":
-            # 固定大小分块
+            for para in paragraphs:
+                if len(current_chunk) + len(para) < chunk_size:
+                    current_chunk += para + "\n\n"
+                else:
+                    if current_chunk:
+                        chunks.append(current_chunk.strip())
+                    # 可以选择添加重叠部分
+                    if chunk_overlap > 0 and current_chunk:
+                        # 获取最后几个段落作为重叠部分
+                        overlap_paras = current_chunk.split('\n\n')[-3:]  # 取最后3个段落
+                        current_chunk = '\n\n'.join(overlap_paras) + '\n\n' + para + '\n\n'
+                    else:
+                        current_chunk = para + "\n\n"
+            
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+        else:
+            chunks = [extracted_text.strip()]
+            
+    elif chunking_strategy == "intelligent":
+        try:
+            print(f"使用智能分块策略处理文件（文件类型：{file.filename}，文本长度：{len(extracted_text)}字符）")
+            file_type = file_ext.lstrip('.')
+            chunks = await gemini_service.intelligent_chunking(extracted_text, file_type)
+            print(f"智能分块完成，生成了{len(chunks)}个块")
+            
+            # 记录分块策略信息
+            for i, chunk in enumerate(chunks):
+                print(f"块 {i+1}/{len(chunks)}: 策略={chunk['metadata'].get('strategy', 'unknown')}, 大小={len(chunk['content'])}字符")
+            
+            # 不保存到数据库时，直接返回分块结果
+            if not save_to_database:
+                return {
+                    "filename": file.filename,
+                    "text_chunks": chunks,
+                    "chunk_strategy": "intelligent",
+                    "document_ids": []
+                }
+        except Exception as e:
+            print(f"智能分块失败，尝试固定尺寸分块: {e}")
+            # 回退到固定尺寸分块
             if len(extracted_text) > chunk_size:
+                current_pos = 0
+                while current_pos < len(extracted_text):
+                    chunk_end = min(current_pos + chunk_size, len(extracted_text))
+                    chunks.append(extracted_text[current_pos:chunk_end].strip())
+                    current_pos += chunk_size - chunk_overlap
+            else:
+                chunks = [extracted_text.strip()]
+    else:  # auto
+        # 根据文件类型和内容自动选择分块策略
+        if len(extracted_text) < 3000:
+            # 短文本直接作为一个块
+            chunks = [extracted_text.strip()]
+        else:
+            try:
+                # 尝试智能分块
+                file_type = file_ext.lstrip('.')
+                chunks = await gemini_service.intelligent_chunking(extracted_text, file_type)
+            except Exception as e:
+                print(f"自动分块中的智能分块失败: {e}，回退到固定尺寸分块")
+                # 回退到固定尺寸分块
                 paragraphs = re.split(r'\n\s*\n', extracted_text)
                 current_chunk = ""
                 
@@ -884,160 +1073,84 @@ async def upload_pdf(
                 
                 if current_chunk:
                     chunks.append(current_chunk.strip())
-            else:
-                chunks = [extracted_text.strip()]
-                
-        elif chunking_strategy == "intelligent":
-            try:
-                print(f"使用智能分块策略处理PDF（文件类型：{file.filename}，文本长度：{len(extracted_text)}字符）")
-                chunks = await gemini_service.intelligent_chunking(extracted_text, "pdf")
-                print(f"智能分块完成，生成了{len(chunks)}个块")
-                
-                # 记录分块策略信息
-                for i, chunk in enumerate(chunks):
-                    print(f"块 {i+1}/{len(chunks)}: 策略={chunk['metadata'].get('strategy', 'unknown')}, 大小={len(chunk['content'])}字符")
-                
-                # 不保存到数据库时，直接返回分块结果
-                if not save_to_database:
-                    return {
-                        "filename": file.filename,
-                        "text_chunks": chunks,
-                        "chunk_strategy": "intelligent",
-                        "success": True
+    
+    # 如果使用智能分块，处理已经生成的结构化块
+    if chunking_strategy == "intelligent" and isinstance(chunks, list) and chunks and isinstance(chunks[0], dict):
+        pass  # 已经是正确格式的块
+    else:
+        # 转换纯文本块为所需的字典格式
+        chunks = [
+            {
+                "content": chunk,
+                "metadata": {
+                    "source": file.filename,
+                    "chunk": i+1,
+                    "total_chunks": len(chunks),
+                    "strategy": chunking_strategy,
+                    "chunk_size": chunk_size if chunking_strategy == "fixed_size" else None,
+                    "overlap": chunk_overlap if chunking_strategy == "fixed_size" else None,
+                    "file_type": file_ext.lstrip('.'),
+                    "import_timestamp": datetime.now().strftime("%Y%m%d%H%M%S")
+                }
+            }
+            for i, chunk in enumerate(chunks)
+        ]
+    
+    # 保存到数据库
+    if save_to_database:
+        try:
+            processed_chunks = []
+            for chunk in chunks:
+                # 处理metadata格式
+                if isinstance(chunk, dict) and "content" in chunk:
+                    content = chunk["content"]
+                    metadata = chunk.get("metadata", {})
+                else:
+                    content = chunk
+                    metadata = {
+                        "source": file.filename,
+                        "strategy": chunking_strategy
                     }
                 
-                # 继续处理保存到数据库
-            except Exception as e:
-                print(f"智能分块失败，错误: {e}，回退到自动分块")
-                error_traceback = traceback.format_exc()
-                print(f"错误详情: {error_traceback}")
-                # 回退到自动分块
-                if len(extracted_text) > MAX_CHUNK_SIZE:
-                    # 简单分块，保留完整段落
-                    paragraphs = re.split(r'\n\s*\n', extracted_text)
-                    current_chunk = ""
-                    
-                    for para in paragraphs:
-                        if len(current_chunk) + len(para) < MAX_CHUNK_SIZE:
-                            current_chunk += para + "\n\n"
-                        else:
-                            if current_chunk:
-                                chunks.append(current_chunk.strip())
-                            current_chunk = para + "\n\n"
-                            
-                    if current_chunk:
-                        chunks.append(current_chunk.strip())
-                else:
-                    chunks = [extracted_text.strip()]
-        else:  # auto 或其他
-            # 自动分块 - 根据文本长度决定
-            
-            # 检测是否是财务报告或年报
-            file_type = os.path.splitext(file.filename)[1][1:].lower() if '.' in file.filename else ''
-            if file_type == 'pdf' and (
-                any(keyword in extracted_text.lower() for keyword in ['annual report', 'financial statement', 'financial report', '年报', '财务报表'])
-            ):
-                print("检测到可能是财务报告或年报，推荐使用智能分块策略")
-                # 如果用户未明确指定分块策略，默认使用智能分块
-                if chunking_strategy == "auto":
-                    try:
-                        print("自动切换到智能分块策略")
-                        chunks = await gemini_service.intelligent_chunking(extracted_text, file_type)
-                        print(f"智能分块完成，生成了{len(chunks)}个块")
-                        
-                        # 不保存到数据库时，直接返回分块结果
-                        if not save_to_database:
-                            return {
-                                "filename": file.filename,
-                                "text_chunks": chunks,
-                                "chunk_strategy": "intelligent",
-                                "success": True
-                            }
-                            
-                        # 继续处理保存到数据库
-                    except Exception as e:
-                        print(f"智能分块失败: {e}，继续使用自动分块")
-                        # 继续使用自动分块逻辑
-            
-            # 正常的自动分块逻辑
-            if len(extracted_text) > MAX_CHUNK_SIZE:
-                # 简单分块，保留完整段落
-                paragraphs = re.split(r'\n\s*\n', extracted_text)
-                current_chunk = ""
+                # 确保metadata中包含文件名和时间戳
+                if "source" not in metadata:
+                    metadata["source"] = file.filename
+                if "import_timestamp" not in metadata:
+                    metadata["import_timestamp"] = datetime.now().strftime("%Y%m%d%H%M%S")
                 
-                for para in paragraphs:
-                    if len(current_chunk) + len(para) < MAX_CHUNK_SIZE:
-                        current_chunk += para + "\n\n"
-                    else:
-                        if current_chunk:
-                            chunks.append(current_chunk.strip())
-                        current_chunk = para + "\n\n"
-                        
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-            else:
-                chunks = [extracted_text.strip()]
-        
-        # 如果需要，保存到数据库
-        if save_to_database:
-            # 生成时间戳作为文档标识
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                processed_chunks.append({
+                    "content": content,
+                    "metadata": metadata,
+                    "chunking_strategy": chunking_strategy
+                })
             
-            for i, chunk_text in enumerate(chunks):
-                # 创建元数据
-                metadata = {
-                    "source": file.filename,
-                    "pdf_filename": file.filename,
-                    "chunk": i + 1,
-                    "total_chunks": len(chunks),
-                    "import_timestamp": timestamp,
-                    "strategy": chunking_strategy,
-                    "preserve_tables": preserve_tables
-                }
-                
-                # 添加固定分块的特定元数据
-                if chunking_strategy == "fixed_size":
-                    metadata.update({
-                        "chunk_size": chunk_size,
-                        "overlap": chunk_overlap
-                    })
-                
-                # 保存到数据库
-                try:
-                    doc = await vector_service.add_document(
-                        db, 
-                        chunk_text, 
-                        metadata,
-                        chunking_strategy
-                    )
+            # 批量保存文档
+            result = await vector_service.add_documents(db, processed_chunks)
+            
+            # 收集文档ID
+            for doc in result:
+                if hasattr(doc, 'id'):
                     document_ids.append(doc.id)
-                except Exception as e:
-                    print(f"保存文档到数据库时出错: {e}")
-            
-            print(f"成功将 {len(document_ids)} 个文档块保存到数据库")
-            
-            return {
-                "filename": file.filename,
-                "text_chunks": len(chunks),
-                "chunk_strategy": chunking_strategy,
-                "document_ids": document_ids,
-                "success": True
-            }
-        else:
-            # 不保存，只返回分块结果
+                elif isinstance(doc, dict) and "id" in doc:
+                    document_ids.append(doc["id"])
+        except Exception as e:
+            print(f"保存文档到数据库失败: {e}")
+            traceback.print_exc()
+            # 返回处理结果，但提示保存失败
             return {
                 "filename": file.filename,
                 "text_chunks": chunks,
                 "chunk_strategy": chunking_strategy,
-                "success": True
+                "document_ids": [],
+                "error": f"保存到数据库失败: {str(e)}"
             }
     
-    except HTTPException:
-        # 直接重新抛出HTTP异常
-        raise
-    except Exception as e:
-        print(f"PDF处理错误: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"处理PDF时出错: {str(e)}")
+    return {
+        "filename": file.filename,
+        "text_chunks": chunks,
+        "chunk_strategy": chunking_strategy,
+        "document_ids": document_ids
+    }
 
 @router.post("/analyze-documents", 
             response_model=CompletionResponse, 
