@@ -353,70 +353,54 @@ paths:
 
   /api/v1/upload_pdf:
     post:
-      tags:
-        - document-service
+      operationId: uploadPdf
       summary: 上传和处理PDF文件
       description: 上传PDF文件，解析内容并存储到向量数据库，支持智能分块
-      parameters:
-        - name: preserve_tables
-          in: query
-          description: 保留表格结构
-          schema:
-            type: boolean
-            default: true
-        - name: use_ocr
-          in: query
-          description: 是否使用OCR处理扫描文档
-          schema:
-            type: boolean
-            default: false
-        - name: chunking_strategy
-          in: query
-          description: "分块策略: 'fixed_size', 'intelligent' 或 'auto'"
-          schema:
-            type: string
-            enum: [fixed_size, intelligent, auto]
-            default: auto
-        - name: chunk_size
-          in: query
-          description: 固定分块尺寸
-          schema:
-            type: integer
-            default: 1000
-        - name: chunk_overlap
-          in: query
-          description: 固定分块重叠大小
-          schema:
-            type: integer
-            default: 200
-        - name: save_to_database
-          in: query
-          description: 是否保存到数据库
-          schema:
-            type: boolean
-            default: true
-        - name: X-Chunking-Strategy
-          in: header
-          description: 分块策略的header参数，优先级高于查询参数
-          schema:
-            type: string
-            enum: [fixed_size, intelligent, auto]
+      tags:
+        - 文档管理
       requestBody:
-        required: true
         content:
           multipart/form-data:
             schema:
               type: object
-              required:
-                - file
               properties:
                 file:
                   type: string
                   format: binary
-                  description: 要上传的PDF文件
+                  description: PDF文件
+                preserve_tables:
+                  type: boolean
+                  description: 是否保留表格结构
+                  default: true
+                use_ocr:
+                  type: boolean
+                  description: 是否使用OCR处理扫描文档
+                  default: false
+                chunking_strategy:
+                  type: string
+                  description: 分块策略 'fixed_size', 'intelligent' 或 'auto'
+                  default: auto
+                  enum:
+                    - fixed_size
+                    - intelligent
+                    - auto
+                chunk_size:
+                  type: integer
+                  description: 固定分块尺寸
+                  default: 1000
+                chunk_overlap:
+                  type: integer
+                  description: 固定分块重叠大小
+                  default: 200
+                save_to_database:
+                  type: boolean
+                  description: 是否保存到数据库
+                  default: true
+              required:
+                - file
       responses:
         '200':
-          description: 成功上传和处理PDF文件
+          description: 成功处理PDF文件
           content:
             application/json:
               schema:
@@ -424,32 +408,112 @@ paths:
                 properties:
                   filename:
                     type: string
+                    description: 上传的文件名
                   text_chunks:
-                    oneOf:
-                      - type: integer
-                        description: 分块数量（当save_to_database为true时）
-                      - type: array
-                        description: 分块内容（当save_to_database为false时）
-                        items:
-                          type: object
-                          properties:
-                            content:
-                              type: string
-                            metadata:
-                              type: object
+                    type: array
+                    description: 文本块数组或内容长度
                   chunk_strategy:
                     type: string
+                    description: 使用的分块策略
                   document_ids:
                     type: array
                     items:
                       type: integer
-                    description: 文档ID列表（当save_to_database为true时）
-                  success:
-                    type: boolean
+                    description: 添加到数据库的文档ID
         '400':
-          description: PDF文件无效或无法提取文本
+          description: 无效请求或不受支持的文件类型
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
         '500':
-          description: 处理PDF文件失败
+          description: 服务器处理错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+
+  /api/v1/upload_file:
+    post:
+      operationId: uploadFile
+      summary: 上传和处理各种文件
+      description: 上传各种文件(PDF、TXT、DOCX、CSV等)，解析内容并存储到向量数据库，支持智能分块
+      tags:
+        - 文档管理
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 要上传的文件（支持PDF、TXT、DOCX、CSV等）
+                preserve_tables:
+                  type: boolean
+                  description: 是否保留表格结构
+                  default: true
+                use_ocr:
+                  type: boolean
+                  description: 是否使用OCR处理扫描文档
+                  default: false
+                chunking_strategy:
+                  type: string
+                  description: 分块策略 'fixed_size', 'intelligent' 或 'auto'
+                  default: auto
+                  enum:
+                    - fixed_size
+                    - intelligent
+                    - auto
+                chunk_size:
+                  type: integer
+                  description: 固定分块尺寸
+                  default: 1000
+                chunk_overlap:
+                  type: integer
+                  description: 固定分块重叠大小
+                  default: 200
+                save_to_database:
+                  type: boolean
+                  description: 是否保存到数据库
+                  default: true
+              required:
+                - file
+      responses:
+        '200':
+          description: 成功处理文件
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  filename:
+                    type: string
+                    description: 上传的文件名
+                  text_chunks:
+                    type: array
+                    description: 文本块数组或内容长度
+                  chunk_strategy:
+                    type: string
+                    description: 使用的分块策略
+                  document_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: 添加到数据库的文档ID
+        '400':
+          description: 无效请求或不受支持的文件类型
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+        '500':
+          description: 服务器处理错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
 
   /api/v1/analyze-documents:
     post:
