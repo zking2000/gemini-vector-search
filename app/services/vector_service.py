@@ -619,11 +619,29 @@ class VectorService:
                 
                 # 执行搜索
                 print(f"使用 {strategy} 策略搜索...")
-                db_results = await self.db.search_documents(
-                    query_embedding, 
-                    limit=limit, 
-                    custom_filter=combined_filter
+                # 修改：不再使用不支持的custom_filter参数
+                # db_results = await self.db.search_documents(
+                #     query_embedding, 
+                #     limit=limit, 
+                #     custom_filter=combined_filter
+                # )
+                
+                # 使用搜索策略参数
+                # 先按策略搜索文档
+                db_results = await self.db.search_documents_by_strategy(
+                    query_embedding,
+                    strategy=strategy,
+                    limit=limit
                 )
+                
+                # 如果需要source_filter，在Python中进一步过滤
+                if source_filter and db_results:
+                    db_results = [
+                        doc for doc in db_results 
+                        if doc.get("metadata", {}).get("source", "").lower().find(source_filter.lower()) != -1
+                    ]
+                    # 确保结果数不超过limit
+                    db_results = db_results[:limit]
                 
                 # 测量时间
                 search_time = (time.time() - start_time) * 1000  # 毫秒
