@@ -154,6 +154,77 @@
 					"response": []
 				},
 				{
+					"name": "上传各类文件",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Chunking-Strategy",
+								"value": "intelligent",
+								"description": "分块策略，可选值：fixed_size, intelligent, auto",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "/path/to/your/file",
+									"description": "要上传的文件（支持PDF、TXT、DOCX、CSV等）"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/upload_file?preserve_tables=true&use_ocr=false&chunking_strategy=auto&chunk_size=1000&chunk_overlap=200&save_to_database=true",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"upload_file"
+							],
+							"query": [
+								{
+									"key": "preserve_tables",
+									"value": "true",
+									"description": "保留表格结构"
+								},
+								{
+									"key": "use_ocr",
+									"value": "false",
+									"description": "是否使用OCR处理扫描文档"
+								},
+								{
+									"key": "chunking_strategy",
+									"value": "auto",
+									"description": "分块策略: 'fixed_size', 'intelligent' 或 'auto'"
+								},
+								{
+									"key": "chunk_size",
+									"value": "1000",
+									"description": "固定分块尺寸"
+								},
+								{
+									"key": "chunk_overlap",
+									"value": "200",
+									"description": "固定分块重叠大小"
+								},
+								{
+									"key": "save_to_database",
+									"value": "true",
+									"description": "是否保存到数据库"
+								}
+							]
+						},
+						"description": "上传各种文件(PDF、TXT、DOCX、CSV等)，解析内容并存储到向量数据库，支持智能分块"
+					},
+					"response": []
+				},
+				{
 					"name": "上传使用双重分块策略的文档",
 					"request": {
 						"method": "POST",

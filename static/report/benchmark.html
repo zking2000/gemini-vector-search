@@ -1,0 +1,1494 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>向量搜索基准测试报告</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f8fa;
+        }
+        h1, h2, h3 {
+            color: #0366d6;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        }
+        .query-card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            margin-bottom: 20px;
+            overflow: hidden;
+            transition: transform 0.2s;
+            position: relative;
+        }
+        .query-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .query-header {
+            padding: 15px 20px;
+            background-color: #f1f8ff;
+            border-bottom: 1px solid #e1e4e8;
+            position: relative;
+        }
+        .query-title {
+            font-weight: 600;
+            margin: 0;
+            color: #24292e;
+        }
+        .query-body {
+            padding: 20px;
+        }
+        .result-card {
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            padding: 15px;
+            background-color: #f6f8fa;
+        }
+        .result-card.fixed {
+            border-left: 4px solid #0366d6;
+        }
+        .result-card.intelligent {
+            border-left: 4px solid #28a745;
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        .result-meta {
+            font-size: 0.85em;
+            color: #586069;
+            margin-bottom: 10px;
+        }
+        .result-content {
+            background-color: #fff;
+            border: 1px solid #e1e4e8;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 0.9em;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        }
+        .highlights {
+            background-color: #fffbdd;
+            padding: 2px;
+            border-radius: 2px;
+        }
+        .summary {
+            margin-top: 30px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            padding: 20px;
+        }
+        .summary-header {
+            border-bottom: 1px solid #e1e4e8;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        .stat-card {
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            color: #586069;
+            text-align: center;
+        }
+        .better {
+            color: #28a745;
+        }
+        .worse {
+            color: #d73a49;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 0.75em;
+            font-weight: 600;
+            border-radius: 2em;
+            margin-left: 8px;
+        }
+        .badge.fixed {
+            background-color: #0366d680;
+            color: white;
+        }
+        .badge.intelligent {
+            background-color: #28a74580;
+            color: white;
+        }
+        .winner-label {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #ffdf1e;
+            color: #24292e;
+            padding: 3px 8px;
+            font-size: 0.7em;
+            border-radius: 2em;
+            font-weight: 600;
+        }
+        .comparison-chart {
+            margin-top: 20px;
+            height: 300px;
+        }
+        .chart-container {
+            margin-top: 20px;
+            height: 350px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            color: #586069;
+            font-size: 0.9em;
+        }
+        pre {
+            overflow-x: auto;
+            background-color: #f6f8fa;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #e1e4e8;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f6f8fa;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f6f8fa;
+        }
+        .page-navigation {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+        }
+        .page-nav-button {
+            background-color: #0366d6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .page-nav-button:disabled {
+            background-color: #c0c0c0;
+            cursor: not-allowed;
+        }
+        .chart-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+        @media (max-width: 768px) {
+            .summary-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <script src="chart.min.js" onerror="document.getElementById('chart-error').style.display='block';"></script>
+</head>
+<body>
+    <div id="chart-error" style="display:none; text-align:center; margin:20px; padding:15px; background-color:#f8d7da; color:#721c24; border-radius:5px;">
+        <p><strong>错误</strong>: 无法加载Chart.js库，图表将不可用。</p>
+        <p>可能的原因: 文件不存在、网络连接问题或脚本被阻止。</p>
+    </div>
+    
+    <div class="header">
+        <h1>向量搜索分块策略基准测试报告</h1>
+        <p>生成时间: 2025-04-23 15:56:56</p>
+        <p>测试查询数量: 10</p>
+    </div>
+
+    <div class="summary">
+        <div class="summary-header">
+            <h2>执行结果摘要</h2>
+        </div>
+        <div class="summary-stats">
+            <div class="stat-card">
+                <div class="stat-label">总查询数</div>
+                <div class="stat-value">10</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">固定分块策略胜出</div>
+                <div class="stat-value">10</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">智能分块策略胜出</div>
+                <div class="stat-value">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">固定分块平均相似度</div>
+                <div class="stat-value">0.0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">智能分块平均相似度</div>
+                <div class="stat-value">0.0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">固定分块平均处理时间</div>
+                <div class="stat-value">8.54ms</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">智能分块平均处理时间</div>
+                <div class="stat-value">0.7ms</div>
+            </div>
+        </div>
+
+        <div class="chart-wrapper">
+            <h3>分块策略胜出比例</h3>
+            <div class="chart-container" style="width:50%; height:300px;">
+                <canvas id="winsChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-wrapper">
+            <h3>查询相似度比较</h3>
+            <div class="chart-container">
+                <canvas id="similarityChart" width="800" height="350"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-wrapper">
+            <h3>查询处理时间比较</h3>
+            <div class="chart-container">
+                <canvas id="timeChart" width="800" height="350"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <h2>查询详细结果</h2>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">What strategic shifts were made in response to geopolitical tensions?</h3>
+            
+            <span class="winner-label">固定分块策略获胜</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>评估结果:</strong> 所有策略都未找到相关文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>固定分块策略结果<span class="badge fixed">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 1.9712448120117188ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>智能分块策略结果<span class="badge intelligent">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 0.6256103515625ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>相似度和处理时间对比</strong>
+            </div>
+            
+            <div class="comparison-chart">
+                <canvas id="comparisonChart-1" width="800" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">How did fixed-income instruments contribute to the fund’s return?</h3>
+            
+            <span class="winner-label">固定分块策略获胜</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>评估结果:</strong> 所有策略都未找到相关文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>固定分块策略结果<span class="badge fixed">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 1.7695426940917969ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>智能分块策略结果<span class="badge intelligent">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 0.7371902465820312ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>相似度和处理时间对比</strong>
+            </div>
+            
+            <div class="comparison-chart">
+                <canvas id="comparisonChart-2" width="800" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">Which companies contributed most to the fund’s return in 2023?</h3>
+            
+            <span class="winner-label">固定分块策略获胜</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>评估结果:</strong> 所有策略都未找到相关文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>固定分块策略结果<span class="badge fixed">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 1.346588134765625ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>智能分块策略结果<span class="badge intelligent">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 0.7326602935791016ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>相似度和处理时间对比</strong>
+            </div>
+            
+            <div class="comparison-chart">
+                <canvas id="comparisonChart-3" width="800" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">How did unlisted real estate perform and why?</h3>
+            
+            <span class="winner-label">固定分块策略获胜</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>评估结果:</strong> 所有策略都未找到相关文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>固定分块策略结果<span class="badge fixed">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 1.5904903411865234ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>智能分块策略结果<span class="badge intelligent">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 0.5950927734375ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>相似度和处理时间对比</strong>
+            </div>
+            
+            <div class="comparison-chart">
+                <canvas id="comparisonChart-4" width="800" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">What long-term investment trends were highlighted?</h3>
+            
+            <span class="winner-label">固定分块策略获胜</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>评估结果:</strong> 所有策略都未找到相关文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>固定分块策略结果<span class="badge fixed">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 1.0654926300048828ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>智能分块策略结果<span class="badge intelligent">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 0.6215572357177734ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>相似度和处理时间对比</strong>
+            </div>
+            
+            <div class="comparison-chart">
+                <canvas id="comparisonChart-5" width="800" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">Which companies were excluded based on responsible investment criteria?</h3>
+            
+            <span class="winner-label">固定分块策略获胜</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>评估结果:</strong> 所有策略都未找到相关文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>固定分块策略结果<span class="badge fixed">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 1.6918182373046875ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>智能分块策略结果<span class="badge intelligent">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 0.6000995635986328ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>相似度和处理时间对比</strong>
+            </div>
+            
+            <div class="comparison-chart">
+                <canvas id="comparisonChart-6" width="800" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">What was the difference between the fund’s return and the benchmark index?</h3>
+            
+            <span class="winner-label">固定分块策略获胜</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>评估结果:</strong> 所有策略都未找到相关文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>固定分块策略结果<span class="badge fixed">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 27.973413467407227ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>智能分块策略结果<span class="badge intelligent">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 0.6799697875976562ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>相似度和处理时间对比</strong>
+            </div>
+            
+            <div class="comparison-chart">
+                <canvas id="comparisonChart-7" width="800" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">How did the fund’s renewable energy investments evolve?</h3>
+            
+            <span class="winner-label">固定分块策略获胜</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>评估结果:</strong> 所有策略都未找到相关文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>固定分块策略结果<span class="badge fixed">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 23.456573486328125ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>智能分块策略结果<span class="badge intelligent">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 0.7851123809814453ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>相似度和处理时间对比</strong>
+            </div>
+            
+            <div class="comparison-chart">
+                <canvas id="comparisonChart-8" width="800" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">What insights came out of the stress test scenarios in the report?</h3>
+            
+            <span class="winner-label">固定分块策略获胜</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>评估结果:</strong> 所有策略都未找到相关文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>固定分块策略结果<span class="badge fixed">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 23.430824279785156ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>智能分块策略结果<span class="badge intelligent">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 0.9121894836425781ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>相似度和处理时间对比</strong>
+            </div>
+            
+            <div class="comparison-chart">
+                <canvas id="comparisonChart-9" width="800" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">What was the percentage allocation across asset classes in 2023?</h3>
+            
+            <span class="winner-label">固定分块策略获胜</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>评估结果:</strong> 所有策略都未找到相关文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>固定分块策略结果<span class="badge fixed">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 1.1262893676757812ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>智能分块策略结果<span class="badge intelligent">0 文档</span></span>
+                    <span>相似度: 0 | 处理时间: 0.7412433624267578ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>前5条结果:</strong>
+                </div>
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>相似度和处理时间对比</strong>
+            </div>
+            
+            <div class="comparison-chart">
+                <canvas id="comparisonChart-10" width="800" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+
+    <div class="footer">
+        <p>© 2025 向量搜索基准测试报告 | 生成于 2025-04-23 15:56:56</p>
+    </div>
+
+    
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                // 胜出比例饼图
+                const winsCtx = document.getElementById('winsChart').getContext('2d');
+                new Chart(winsCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['固定分块策略', '智能分块策略'],
+                        datasets: [{
+                            data: [10, 0],
+                            backgroundColor: ['rgba(3, 102, 214, 0.8)', 'rgba(40, 167, 69, 0.8)'],
+                            borderColor: ['rgba(3, 102, 214, 1)', 'rgba(40, 167, 69, 1)'],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    font: {
+                                        size: 14
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                bodyFont: {
+                                    size: 14
+                                },
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.label + ': ' + context.raw + ' 次';
+                                    }
+                                }
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+
+                // 相似度比较图
+                const similarityCtx = document.getElementById('similarityChart').getContext('2d');
+                new Chart(similarityCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8', 'Q9', 'Q10'],
+                        datasets: [{
+                            label: '固定分块相似度',
+                            data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块相似度',
+                            data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    title: function(context) {
+                                        const index = context[0].dataIndex;
+                                        return "[{'strategies': {'fixed_size': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 1.9712448120117188, 'source_filter': None, 'strategy': 'fixed_size'}, 'intelligent': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 0.6256103515625, 'source_filter': None, 'strategy': 'intelligent'}}, 'best_strategy': 'fixed_size', 'query': 'What strategic shifts were made in response to geopolitical tensions?', 'evaluation': {'strategy': 'fixed_size', 'reason': '所有策略都未找到相关文档', 'scores': {'fixed_size': {'similarity': 0, 'count': 0, 'time_ms': 1.9712448120117188}, 'intelligent': {'similarity': 0, 'count': 0, 'time_ms': 0.6256103515625}}}}, {'strategies': {'fixed_size': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 1.7695426940917969, 'source_filter': None, 'strategy': 'fixed_size'}, 'intelligent': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 0.7371902465820312, 'source_filter': None, 'strategy': 'intelligent'}}, 'best_strategy': 'fixed_size', 'query': 'How did fixed-income instruments contribute to the fund’s return?', 'evaluation': {'strategy': 'fixed_size', 'reason': '所有策略都未找到相关文档', 'scores': {'fixed_size': {'similarity': 0, 'count': 0, 'time_ms': 1.7695426940917969}, 'intelligent': {'similarity': 0, 'count': 0, 'time_ms': 0.7371902465820312}}}}, {'strategies': {'fixed_size': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 1.346588134765625, 'source_filter': None, 'strategy': 'fixed_size'}, 'intelligent': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 0.7326602935791016, 'source_filter': None, 'strategy': 'intelligent'}}, 'best_strategy': 'fixed_size', 'query': 'Which companies contributed most to the fund’s return in 2023?', 'evaluation': {'strategy': 'fixed_size', 'reason': '所有策略都未找到相关文档', 'scores': {'fixed_size': {'similarity': 0, 'count': 0, 'time_ms': 1.346588134765625}, 'intelligent': {'similarity': 0, 'count': 0, 'time_ms': 0.7326602935791016}}}}, {'strategies': {'fixed_size': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 1.5904903411865234, 'source_filter': None, 'strategy': 'fixed_size'}, 'intelligent': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 0.5950927734375, 'source_filter': None, 'strategy': 'intelligent'}}, 'best_strategy': 'fixed_size', 'query': 'How did unlisted real estate perform and why?', 'evaluation': {'strategy': 'fixed_size', 'reason': '所有策略都未找到相关文档', 'scores': {'fixed_size': {'similarity': 0, 'count': 0, 'time_ms': 1.5904903411865234}, 'intelligent': {'similarity': 0, 'count': 0, 'time_ms': 0.5950927734375}}}}, {'strategies': {'fixed_size': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 1.0654926300048828, 'source_filter': None, 'strategy': 'fixed_size'}, 'intelligent': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 0.6215572357177734, 'source_filter': None, 'strategy': 'intelligent'}}, 'best_strategy': 'fixed_size', 'query': 'What long-term investment trends were highlighted?', 'evaluation': {'strategy': 'fixed_size', 'reason': '所有策略都未找到相关文档', 'scores': {'fixed_size': {'similarity': 0, 'count': 0, 'time_ms': 1.0654926300048828}, 'intelligent': {'similarity': 0, 'count': 0, 'time_ms': 0.6215572357177734}}}}, {'strategies': {'fixed_size': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 1.6918182373046875, 'source_filter': None, 'strategy': 'fixed_size'}, 'intelligent': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 0.6000995635986328, 'source_filter': None, 'strategy': 'intelligent'}}, 'best_strategy': 'fixed_size', 'query': 'Which companies were excluded based on responsible investment criteria?', 'evaluation': {'strategy': 'fixed_size', 'reason': '所有策略都未找到相关文档', 'scores': {'fixed_size': {'similarity': 0, 'count': 0, 'time_ms': 1.6918182373046875}, 'intelligent': {'similarity': 0, 'count': 0, 'time_ms': 0.6000995635986328}}}}, {'strategies': {'fixed_size': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 27.973413467407227, 'source_filter': None, 'strategy': 'fixed_size'}, 'intelligent': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 0.6799697875976562, 'source_filter': None, 'strategy': 'intelligent'}}, 'best_strategy': 'fixed_size', 'query': 'What was the difference between the fund’s return and the benchmark index?', 'evaluation': {'strategy': 'fixed_size', 'reason': '所有策略都未找到相关文档', 'scores': {'fixed_size': {'similarity': 0, 'count': 0, 'time_ms': 27.973413467407227}, 'intelligent': {'similarity': 0, 'count': 0, 'time_ms': 0.6799697875976562}}}}, {'strategies': {'fixed_size': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 23.456573486328125, 'source_filter': None, 'strategy': 'fixed_size'}, 'intelligent': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 0.7851123809814453, 'source_filter': None, 'strategy': 'intelligent'}}, 'best_strategy': 'fixed_size', 'query': 'How did the fund’s renewable energy investments evolve?', 'evaluation': {'strategy': 'fixed_size', 'reason': '所有策略都未找到相关文档', 'scores': {'fixed_size': {'similarity': 0, 'count': 0, 'time_ms': 23.456573486328125}, 'intelligent': {'similarity': 0, 'count': 0, 'time_ms': 0.7851123809814453}}}}, {'strategies': {'fixed_size': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 23.430824279785156, 'source_filter': None, 'strategy': 'fixed_size'}, 'intelligent': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 0.9121894836425781, 'source_filter': None, 'strategy': 'intelligent'}}, 'best_strategy': 'fixed_size', 'query': 'What insights came out of the stress test scenarios in the report?', 'evaluation': {'strategy': 'fixed_size', 'reason': '所有策略都未找到相关文档', 'scores': {'fixed_size': {'similarity': 0, 'count': 0, 'time_ms': 23.430824279785156}, 'intelligent': {'similarity': 0, 'count': 0, 'time_ms': 0.9121894836425781}}}}, {'strategies': {'fixed_size': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 1.1262893676757812, 'source_filter': None, 'strategy': 'fixed_size'}, 'intelligent': {'count': 0, 'documents': [], 'avg_similarity': 0, 'time_ms': 0.7412433624267578, 'source_filter': None, 'strategy': 'intelligent'}}, 'best_strategy': 'fixed_size', 'query': 'What was the percentage allocation across asset classes in 2023?', 'evaluation': {'strategy': 'fixed_size', 'reason': '所有策略都未找到相关文档', 'scores': {'fixed_size': {'similarity': 0, 'count': 0, 'time_ms': 1.1262893676757812}, 'intelligent': {'similarity': 0, 'count': 0, 'time_ms': 0.7412433624267578}}}}]".split(",")[index].query;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                min: 0.7,
+                                max: 1
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+
+                // 处理时间比较图
+                const timeCtx = document.getElementById('timeChart').getContext('2d');
+                new Chart(timeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8', 'Q9', 'Q10'],
+                        datasets: [{
+                            label: '固定分块处理时间 (ms)',
+                            data: [1.9712448120117188, 1.7695426940917969, 1.346588134765625, 1.5904903411865234, 1.0654926300048828, 1.6918182373046875, 27.973413467407227, 23.456573486328125, 23.430824279785156, 1.1262893676757812],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块处理时间 (ms)',
+                            data: [0.6256103515625, 0.7371902465820312, 0.7326602935791016, 0.5950927734375, 0.6215572357177734, 0.6000995635986328, 0.6799697875976562, 0.7851123809814453, 0.9121894836425781, 0.7412433624267578],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+
+                // 各查询的对比图
+                
+                const comparisonCtx1 = document.getElementById('comparisonChart-1').getContext('2d');
+                new Chart(comparisonCtx1, {
+                    type: 'bar',
+                    data: {
+                        labels: ['相似度 (x10)', '处理时间 (ms)'],
+                        datasets: [{
+                            label: '固定分块策略',
+                            data: [
+                                0, 
+                                1.9712448120117188
+                            ],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块策略',
+                            data: [
+                                0, 
+                                0.6256103515625
+                            ],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.dataset.label || '';
+                                        let value = context.raw;
+                                        if (context.dataIndex === 0) {
+                                            return label + ': ' + (value / 10).toFixed(4);
+                                        }
+                                        return label + ': ' + value + ' ms';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+                
+                const comparisonCtx2 = document.getElementById('comparisonChart-2').getContext('2d');
+                new Chart(comparisonCtx2, {
+                    type: 'bar',
+                    data: {
+                        labels: ['相似度 (x10)', '处理时间 (ms)'],
+                        datasets: [{
+                            label: '固定分块策略',
+                            data: [
+                                0, 
+                                1.7695426940917969
+                            ],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块策略',
+                            data: [
+                                0, 
+                                0.7371902465820312
+                            ],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.dataset.label || '';
+                                        let value = context.raw;
+                                        if (context.dataIndex === 0) {
+                                            return label + ': ' + (value / 10).toFixed(4);
+                                        }
+                                        return label + ': ' + value + ' ms';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+                
+                const comparisonCtx3 = document.getElementById('comparisonChart-3').getContext('2d');
+                new Chart(comparisonCtx3, {
+                    type: 'bar',
+                    data: {
+                        labels: ['相似度 (x10)', '处理时间 (ms)'],
+                        datasets: [{
+                            label: '固定分块策略',
+                            data: [
+                                0, 
+                                1.346588134765625
+                            ],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块策略',
+                            data: [
+                                0, 
+                                0.7326602935791016
+                            ],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.dataset.label || '';
+                                        let value = context.raw;
+                                        if (context.dataIndex === 0) {
+                                            return label + ': ' + (value / 10).toFixed(4);
+                                        }
+                                        return label + ': ' + value + ' ms';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+                
+                const comparisonCtx4 = document.getElementById('comparisonChart-4').getContext('2d');
+                new Chart(comparisonCtx4, {
+                    type: 'bar',
+                    data: {
+                        labels: ['相似度 (x10)', '处理时间 (ms)'],
+                        datasets: [{
+                            label: '固定分块策略',
+                            data: [
+                                0, 
+                                1.5904903411865234
+                            ],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块策略',
+                            data: [
+                                0, 
+                                0.5950927734375
+                            ],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.dataset.label || '';
+                                        let value = context.raw;
+                                        if (context.dataIndex === 0) {
+                                            return label + ': ' + (value / 10).toFixed(4);
+                                        }
+                                        return label + ': ' + value + ' ms';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+                
+                const comparisonCtx5 = document.getElementById('comparisonChart-5').getContext('2d');
+                new Chart(comparisonCtx5, {
+                    type: 'bar',
+                    data: {
+                        labels: ['相似度 (x10)', '处理时间 (ms)'],
+                        datasets: [{
+                            label: '固定分块策略',
+                            data: [
+                                0, 
+                                1.0654926300048828
+                            ],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块策略',
+                            data: [
+                                0, 
+                                0.6215572357177734
+                            ],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.dataset.label || '';
+                                        let value = context.raw;
+                                        if (context.dataIndex === 0) {
+                                            return label + ': ' + (value / 10).toFixed(4);
+                                        }
+                                        return label + ': ' + value + ' ms';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+                
+                const comparisonCtx6 = document.getElementById('comparisonChart-6').getContext('2d');
+                new Chart(comparisonCtx6, {
+                    type: 'bar',
+                    data: {
+                        labels: ['相似度 (x10)', '处理时间 (ms)'],
+                        datasets: [{
+                            label: '固定分块策略',
+                            data: [
+                                0, 
+                                1.6918182373046875
+                            ],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块策略',
+                            data: [
+                                0, 
+                                0.6000995635986328
+                            ],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.dataset.label || '';
+                                        let value = context.raw;
+                                        if (context.dataIndex === 0) {
+                                            return label + ': ' + (value / 10).toFixed(4);
+                                        }
+                                        return label + ': ' + value + ' ms';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+                
+                const comparisonCtx7 = document.getElementById('comparisonChart-7').getContext('2d');
+                new Chart(comparisonCtx7, {
+                    type: 'bar',
+                    data: {
+                        labels: ['相似度 (x10)', '处理时间 (ms)'],
+                        datasets: [{
+                            label: '固定分块策略',
+                            data: [
+                                0, 
+                                27.973413467407227
+                            ],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块策略',
+                            data: [
+                                0, 
+                                0.6799697875976562
+                            ],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.dataset.label || '';
+                                        let value = context.raw;
+                                        if (context.dataIndex === 0) {
+                                            return label + ': ' + (value / 10).toFixed(4);
+                                        }
+                                        return label + ': ' + value + ' ms';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+                
+                const comparisonCtx8 = document.getElementById('comparisonChart-8').getContext('2d');
+                new Chart(comparisonCtx8, {
+                    type: 'bar',
+                    data: {
+                        labels: ['相似度 (x10)', '处理时间 (ms)'],
+                        datasets: [{
+                            label: '固定分块策略',
+                            data: [
+                                0, 
+                                23.456573486328125
+                            ],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块策略',
+                            data: [
+                                0, 
+                                0.7851123809814453
+                            ],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.dataset.label || '';
+                                        let value = context.raw;
+                                        if (context.dataIndex === 0) {
+                                            return label + ': ' + (value / 10).toFixed(4);
+                                        }
+                                        return label + ': ' + value + ' ms';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+                
+                const comparisonCtx9 = document.getElementById('comparisonChart-9').getContext('2d');
+                new Chart(comparisonCtx9, {
+                    type: 'bar',
+                    data: {
+                        labels: ['相似度 (x10)', '处理时间 (ms)'],
+                        datasets: [{
+                            label: '固定分块策略',
+                            data: [
+                                0, 
+                                23.430824279785156
+                            ],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块策略',
+                            data: [
+                                0, 
+                                0.9121894836425781
+                            ],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.dataset.label || '';
+                                        let value = context.raw;
+                                        if (context.dataIndex === 0) {
+                                            return label + ': ' + (value / 10).toFixed(4);
+                                        }
+                                        return label + ': ' + value + ' ms';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+                
+                const comparisonCtx10 = document.getElementById('comparisonChart-10').getContext('2d');
+                new Chart(comparisonCtx10, {
+                    type: 'bar',
+                    data: {
+                        labels: ['相似度 (x10)', '处理时间 (ms)'],
+                        datasets: [{
+                            label: '固定分块策略',
+                            data: [
+                                0, 
+                                1.1262893676757812
+                            ],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块策略',
+                            data: [
+                                0, 
+                                0.7412433624267578
+                            ],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.dataset.label || '';
+                                        let value = context.raw;
+                                        if (context.dataIndex === 0) {
+                                            return label + ': ' + (value / 10).toFixed(4);
+                                        }
+                                        return label + ': ' + value + ' ms';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+                
+            } catch (e) {
+                console.error('DOMContentLoaded error:', e);
+            }
+        });
+    </script>
+</body>
+</html>

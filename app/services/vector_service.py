@@ -186,37 +186,13 @@ class VectorService:
         Returns:
             Added document object
         """
+        # Validate input
+        if not content:
+            raise ValueError("Document content cannot be empty")
+        
+        # Generate embedding using the Gemini API
         try:
-            # 确保content是字符串类型
-            if content is None:
-                content = ""
-            elif isinstance(content, dict):
-                # 尝试转换字典为字符串
-                try:
-                    content = json.dumps(content)
-                    print(f"警告：content参数为字典类型，已自动转换为JSON字符串")
-                except Exception as e:
-                    raise ValueError(f"content参数必须是字符串类型，无法转换字典为JSON字符串: {e}")
-            elif not isinstance(content, str):
-                # 尝试进行通用转换
-                try:
-                    content = str(content)
-                    print(f"警告：content参数为{type(content).__name__}类型，已自动转换为字符串")
-                except Exception as e:
-                    raise ValueError(f"content参数必须是字符串类型，无法转换{type(content).__name__}类型: {e}")
-            
-            # Generate embedding vector
             embedding = await self.gemini.generate_embedding(content)
-            
-            # Print debug information
-            print(f"Adding document: content length={len(content)}, metadata={metadata}, chunking_strategy={chunking_strategy}")
-            print(f"Embedding vector length={len(embedding)}")
-            
-            # Check database table structure
-            inspector = inspect(db.bind)
-            table_columns = inspector.get_columns("documents")
-            column_names = [col['name'] for col in table_columns]
-            print(f"Table structure: {column_names}")
             
             # Create document object based on updated Document model
             # Ensure title is not empty, use default value if content is empty
@@ -259,14 +235,9 @@ class VectorService:
                 db.commit()
                 db.refresh(doc)
                 return doc
-                
         except Exception as e:
-            print(f"Error adding document to database: {e}")
-            # Ensure session is rolled back
-            try:
-                db.rollback()
-            except:
-                pass
+            print(f"Error adding document: {e}")
+            traceback.print_exc()
             raise
     
     @cached(ttl=24*3600)  # Cache for 24 hours
@@ -935,13 +906,18 @@ class VectorService:
                             failed_docs.append({**doc, "error": "嵌入向量生成失败"})
                             continue
                         
-                        # 在这里使用传入的数据库会话
+                        # 直接使用add_document方法，无需传递db参数
+                        content = doc_with_embedding.get('content', '')
+                        embedding = doc_with_embedding.get('embedding', [])
+                        metadata = doc_with_embedding.get('metadata', {})
+                        chunking_strategy = doc_with_embedding.get('chunking_strategy', 'fixed_size')
+                        
+                        # 使用DatabaseService的方法签名正确调用add_document
                         added_doc = await self.db.add_document(
-                            db=db,
-                            content=doc_with_embedding.get('content', ''),
-                            embedding=doc_with_embedding.get('embedding'),
-                            metadata=doc_with_embedding.get('metadata', {}),
-                            chunking_strategy=doc_with_embedding.get('chunking_strategy', 'fixed_size')
+                            content=content,
+                            embedding=embedding,
+                            metadata=metadata,
+                            chunking_strategy=chunking_strategy
                         )
                         
                         successful_docs.append(added_doc)

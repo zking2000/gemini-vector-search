@@ -21,16 +21,16 @@ import threading
 
 # 预设的测试问题集
 DEFAULT_QUESTIONS = [
-    "What was the return on unlisted real estate investments in 2023?",
-    "How did office properties perform compared to other real estate investments?",
-    "What percentage of the fund was made up by real estate at the end of 2023?",
-    "What was the annual return on bond investments in 2023?",
-    "What was the return on unlisted renewable energy infrastructure in 2023?",
-    "What factors contributed to the real estate performance in 2023?",
-    "What is the upper limit for unlisted real estate investments?",
-    "How does the fund fund unlisted real estate investments?",
-    "Which countries' properties made negative contributions to the fund?",
-    "What was the rental income percentage for unlisted real estate investments in 2023?"
+    "What was the percentage allocation across asset classes in 2023?",
+    "Which companies contributed most to the fund’s return in 2023?",
+    "What was the difference between the fund’s return and the benchmark index?",
+    "How did unlisted real estate perform and why?",
+    "What strategic shifts were made in response to geopolitical tensions?",
+    "Which companies were excluded based on responsible investment criteria?",
+    "What insights came out of the stress test scenarios in the report?",
+    "How did the fund’s renewable energy investments evolve?",
+    "What long-term investment trends were highlighted?",
+    "How did fixed-income instruments contribute to the fund’s return?"
 ]
 
 # HTML模板
@@ -266,9 +266,14 @@ HTML_TEMPLATE = """
             }
         }
     </style>
-    <script src="chart.min.js"></script>
+    <script src="chart.min.js" onerror="document.getElementById('chart-error').style.display='block';"></script>
 </head>
 <body>
+    <div id="chart-error" style="display:none; text-align:center; margin:20px; padding:15px; background-color:#f8d7da; color:#721c24; border-radius:5px;">
+        <p><strong>错误</strong>: 无法加载Chart.js库，图表将不可用。</p>
+        <p>可能的原因: 文件不存在、网络连接问题或脚本被阻止。</p>
+    </div>
+    
     <div class="header">
         <h1>向量搜索分块策略基准测试报告</h1>
         <p>生成时间: {{ timestamp }}</p>
@@ -313,21 +318,21 @@ HTML_TEMPLATE = """
         <div class="chart-wrapper">
             <h3>分块策略胜出比例</h3>
             <div class="chart-container" style="width:50%; height:300px;">
-                <canvas id="winsChart"></canvas>
+                <canvas id="winsChart" width="400" height="300"></canvas>
             </div>
         </div>
         
         <div class="chart-wrapper">
             <h3>查询相似度比较</h3>
             <div class="chart-container">
-                <canvas id="similarityChart"></canvas>
+                <canvas id="similarityChart" width="800" height="350"></canvas>
             </div>
         </div>
 
         <div class="chart-wrapper">
             <h3>查询处理时间比较</h3>
             <div class="chart-container">
-                <canvas id="timeChart"></canvas>
+                <canvas id="timeChart" width="800" height="350"></canvas>
             </div>
         </div>
     </div>
@@ -391,7 +396,7 @@ HTML_TEMPLATE = """
             </div>
             
             <div class="comparison-chart">
-                <canvas id="comparisonChart-{{ loop.index }}"></canvas>
+                <canvas id="comparisonChart-{{ loop.index }}" width="800" height="300"></canvas>
             </div>
         </div>
     </div>
@@ -401,169 +406,207 @@ HTML_TEMPLATE = """
         <p>© {{ current_year }} 向量搜索基准测试报告 | 生成于 {{ timestamp }}</p>
     </div>
 
+    {% if chart_js_missing %}
+    <div style="text-align:center; margin:20px; padding:15px; background-color:#fff3cd; color:#856404; border-radius:5px;">
+        <p><strong>注意</strong>: Chart.js库无法加载，图表功能不可用。请确保report目录下有chart.min.js文件或网络连接正常。</p>
+        <p>您仍然可以查看数据和比较结果。</p>
+    </div>
+    {% endif %}
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // 胜出比例饼图
-            const winsCtx = document.getElementById('winsChart').getContext('2d');
-            new Chart(winsCtx, {
-                type: 'pie',
-                data: {
-                    labels: ['固定分块策略', '智能分块策略'],
-                    datasets: [{
-                        data: [{{ fixed_wins }}, {{ intelligent_wins }}],
-                        backgroundColor: ['rgba(3, 102, 214, 0.6)', 'rgba(40, 167, 69, 0.6)'],
-                        borderColor: ['rgba(3, 102, 214, 1)', 'rgba(40, 167, 69, 1)'],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }
-            });
-
-            // 相似度比较图
-            const similarityCtx = document.getElementById('similarityChart').getContext('2d');
-            new Chart(similarityCtx, {
-                type: 'bar',
-                data: {
-                    labels: [{% for query in queries %}'Q{{ loop.index }}'{% if not loop.last %}, {% endif %}{% endfor %}],
-                    datasets: [{
-                        label: '固定分块相似度',
-                        data: [{% for query in queries %}{{ query.strategies.fixed_size.avg_similarity }}{% if not loop.last %}, {% endif %}{% endfor %}],
-                        backgroundColor: 'rgba(3, 102, 214, 0.6)',
-                        borderColor: 'rgba(3, 102, 214, 1)',
-                        borderWidth: 1
-                    }, {
-                        label: '智能分块相似度',
-                        data: [{% for query in queries %}{{ query.strategies.intelligent.avg_similarity }}{% if not loop.last %}, {% endif %}{% endfor %}],
-                        backgroundColor: 'rgba(40, 167, 69, 0.6)',
-                        borderColor: 'rgba(40, 167, 69, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top'
-                        },
-                        tooltip: {
-                            callbacks: {
-                                title: function(context) {
-                                    const index = context[0].dataIndex;
-                                    return "{{ queries }}".split(",")[index].query;
-                                }
-                            }
-                        }
+            try {
+                // 胜出比例饼图
+                const winsCtx = document.getElementById('winsChart').getContext('2d');
+                new Chart(winsCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['固定分块策略', '智能分块策略'],
+                        datasets: [{
+                            data: [{{ fixed_wins }}, {{ intelligent_wins }}],
+                            backgroundColor: ['rgba(3, 102, 214, 0.8)', 'rgba(40, 167, 69, 0.8)'],
+                            borderColor: ['rgba(3, 102, 214, 1)', 'rgba(40, 167, 69, 1)'],
+                            borderWidth: 1
+                        }]
                     },
-                    scales: {
-                        y: {
-                            beginAtZero: false,
-                            min: 0.7,
-                            max: 1
-                        }
-                    }
-                }
-            });
-
-            // 处理时间比较图
-            const timeCtx = document.getElementById('timeChart').getContext('2d');
-            new Chart(timeCtx, {
-                type: 'bar',
-                data: {
-                    labels: [{% for query in queries %}'Q{{ loop.index }}'{% if not loop.last %}, {% endif %}{% endfor %}],
-                    datasets: [{
-                        label: '固定分块处理时间 (ms)',
-                        data: [{% for query in queries %}{{ query.strategies.fixed_size.time_ms }}{% if not loop.last %}, {% endif %}{% endfor %}],
-                        backgroundColor: 'rgba(3, 102, 214, 0.6)',
-                        borderColor: 'rgba(3, 102, 214, 1)',
-                        borderWidth: 1
-                    }, {
-                        label: '智能分块处理时间 (ms)',
-                        data: [{% for query in queries %}{{ query.strategies.intelligent.time_ms }}{% if not loop.last %}, {% endif %}{% endfor %}],
-                        backgroundColor: 'rgba(40, 167, 69, 0.6)',
-                        borderColor: 'rgba(40, 167, 69, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top'
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-
-            // 各查询的对比图
-            {% for query in queries %}
-            const comparisonCtx{{ loop.index }} = document.getElementById('comparisonChart-{{ loop.index }}').getContext('2d');
-            new Chart(comparisonCtx{{ loop.index }}, {
-                type: 'bar',
-                data: {
-                    labels: ['相似度 (x10)', '处理时间 (ms)'],
-                    datasets: [{
-                        label: '固定分块策略',
-                        data: [
-                            {{ query.strategies.fixed_size.avg_similarity * 10 }}, 
-                            {{ query.strategies.fixed_size.time_ms }}
-                        ],
-                        backgroundColor: 'rgba(3, 102, 214, 0.6)',
-                        borderColor: 'rgba(3, 102, 214, 1)',
-                        borderWidth: 1
-                    }, {
-                        label: '智能分块策略',
-                        data: [
-                            {{ query.strategies.intelligent.avg_similarity * 10 }}, 
-                            {{ query.strategies.intelligent.time_ms }}
-                        ],
-                        backgroundColor: 'rgba(40, 167, 69, 0.6)',
-                        borderColor: 'rgba(40, 167, 69, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top'
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const label = context.dataset.label || '';
-                                    let value = context.raw;
-                                    if (context.dataIndex === 0) {
-                                        return label + ': ' + (value / 10).toFixed(4);
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    font: {
+                                        size: 14
                                     }
-                                    return label + ': ' + value + ' ms';
+                                }
+                            },
+                            tooltip: {
+                                bodyFont: {
+                                    size: 14
+                                },
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.label + ': ' + context.raw + ' 次';
+                                    }
                                 }
                             }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
                         }
                     }
-                }
-            });
-            {% endfor %}
+                });
+
+                // 相似度比较图
+                const similarityCtx = document.getElementById('similarityChart').getContext('2d');
+                new Chart(similarityCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: [{% for query in queries %}'Q{{ loop.index }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+                        datasets: [{
+                            label: '固定分块相似度',
+                            data: [{% for query in queries %}{{ query.strategies.fixed_size.avg_similarity }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块相似度',
+                            data: [{% for query in queries %}{{ query.strategies.intelligent.avg_similarity }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    title: function(context) {
+                                        const index = context[0].dataIndex;
+                                        return "{{ queries }}".split(",")[index].query;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                min: 0.7,
+                                max: 1
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+
+                // 处理时间比较图
+                const timeCtx = document.getElementById('timeChart').getContext('2d');
+                new Chart(timeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: [{% for query in queries %}'Q{{ loop.index }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+                        datasets: [{
+                            label: '固定分块处理时间 (ms)',
+                            data: [{% for query in queries %}{{ query.strategies.fixed_size.time_ms }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块处理时间 (ms)',
+                            data: [{% for query in queries %}{{ query.strategies.intelligent.time_ms }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+
+                // 各查询的对比图
+                {% for query in queries %}
+                const comparisonCtx{{ loop.index }} = document.getElementById('comparisonChart-{{ loop.index }}').getContext('2d');
+                new Chart(comparisonCtx{{ loop.index }}, {
+                    type: 'bar',
+                    data: {
+                        labels: ['相似度 (x10)', '处理时间 (ms)'],
+                        datasets: [{
+                            label: '固定分块策略',
+                            data: [
+                                {{ query.strategies.fixed_size.avg_similarity * 10 }}, 
+                                {{ query.strategies.fixed_size.time_ms }}
+                            ],
+                            backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                            borderColor: 'rgba(3, 102, 214, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '智能分块策略',
+                            data: [
+                                {{ query.strategies.intelligent.avg_similarity * 10 }}, 
+                                {{ query.strategies.intelligent.time_ms }}
+                            ],
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.dataset.label || '';
+                                        let value = context.raw;
+                                        if (context.dataIndex === 0) {
+                                            return label + ': ' + (value / 10).toFixed(4);
+                                        }
+                                        return label + ': ' + value + ' ms';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        animation: {
+                            duration: 0 // 禁用动画，确保立即渲染
+                        }
+                    }
+                });
+                {% endfor %}
+            } catch (e) {
+                console.error('DOMContentLoaded error:', e);
+            }
         });
     </script>
 </body>
@@ -573,18 +616,35 @@ HTML_TEMPLATE = """
 async def fetch_search_result(session, url, query, limit=5, source_filter=""):
     """异步获取搜索结果"""
     try:
+        # 不再尝试使用不存在的compare-strategies-v2端点
+        
         payload = {
             "query": query,
-            "limit": limit
+            "limit": limit,
+            "disable_cache": True  # 添加禁用缓存标志
         }
+        
+        # 如果有source_filter，添加到payload
+        if source_filter:
+            payload["source_filter"] = source_filter
+            
         headers = {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "X-Disable-Cache": "true"  # 添加HTTP头禁用缓存
         }
+        
+        print(f"发送请求到 {url}")
+        print(f"请求参数: {json.dumps(payload, ensure_ascii=False)}")
         
         try:
             async with session.post(url, json=payload, headers=headers, timeout=30) as response:
                 if response.status == 200:
-                    return await response.json()
+                    result = await response.json()
+                    # 打印API返回的结果
+                    print(f"\n查询: '{query}'")
+                    print(f"API响应结果:")
+                    print(json.dumps(result, ensure_ascii=False, indent=2))
+                    return result
                 else:
                     error_text = await response.text()
                     print(f"错误: 状态码 {response.status} - {error_text}")
@@ -639,8 +699,10 @@ async def fetch_search_result(session, url, query, limit=5, source_filter=""):
 async def process_queries(base_url, questions, limit=5, source_filter=""):
     """处理所有查询"""
     url = f"{base_url}/api/v1/compare-strategies"
-    if source_filter:
-        url += f"?source_filter={source_filter}"
+    
+    # 不再直接在URL中添加source_filter参数，我们会在payload中处理
+    # if source_filter:
+    #     url += f"?source_filter={source_filter}"
     
     async with aiohttp.ClientSession() as session:
         tasks = []
@@ -667,21 +729,47 @@ def download_chart_js(output_dir):
         try:
             print(f"复制Chart.js从 {local_chart_path} 到 {output_path}")
             shutil.copy2(local_chart_path, output_path)
-            print("复制成功")
+            print(f"复制成功，文件大小: {os.path.getsize(output_path)} 字节")
             return True
         except Exception as e:
             print(f"复制Chart.js失败: {e}")
+            print(f"尝试从CDN下载...")
             
     # 如果本地文件不存在或复制失败，尝试从CDN下载
     try:
-        url = "https://cdn.jsdelivr.net/npm/chart.js/dist/chart.min.js"
+        # 使用最新稳定版本的Chart.js
+        url = "https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"
         print(f"从CDN下载Chart.js到 {output_path}")
         urllib.request.urlretrieve(url, output_path)
-        print("下载成功")
+        file_size = os.path.getsize(output_path)
+        print(f"下载成功，文件大小: {file_size} 字节")
+        
+        # 验证文件大小是否合理 (至少100KB)
+        if file_size < 100000:
+            print(f"警告: 下载的文件大小异常 ({file_size} 字节)，可能下载不完整")
+            
+        # 验证文件内容是否为有效的JavaScript
+        with open(output_path, 'r', encoding='utf-8', errors='ignore') as f:
+            content_start = f.read(100).strip()  # 读取前100个字符
+            if not content_start.startswith('!function') and not content_start.startswith('/*') and not content_start.startswith('//'):
+                print(f"警告: 下载的文件可能不是有效的JavaScript文件")
+                print(f"文件开头: {content_start[:50]}...")
+                
         return True
     except Exception as e:
         print(f"下载Chart.js失败: {e}")
-        return False
+        print("尝试使用备用CDN链接...")
+        
+        try:
+            # 备用链接
+            url = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"
+            urllib.request.urlretrieve(url, output_path)
+            print(f"备用链接下载成功，文件大小: {os.path.getsize(output_path)} 字节")
+            return True
+        except Exception as e2:
+            print(f"备用链接下载也失败: {e2}")
+            print("生成无图表版本的报告...")
+            return False
 
 def generate_report(results, output_file):
     """生成HTML报告"""
@@ -815,7 +903,8 @@ def generate_report(results, output_file):
         "intelligent_avg_time": intelligent_avg_time,
         "queries": valid_results,
         "has_errors": has_errors,
-        "errors": [r for r in results if "error" in r]
+        "errors": [r for r in results if "error" in r],
+        "chart_js_missing": False
     }
     
     # 确保输出目录存在
@@ -824,7 +913,16 @@ def generate_report(results, output_file):
         os.makedirs(output_dir)
     
     # 下载Chart.js到输出目录
-    download_chart_js(output_dir)
+    has_chart_js = download_chart_js(output_dir)
+    
+    # 如果无法下载Chart.js，修改模板以使用简单的内联图表
+    if not has_chart_js:
+        print("检测到Chart.js不可用，使用简单内联图表替代...")
+        # 在HTML中添加内联的简单图表代码
+        template_data["use_inline_chart"] = True
+        template_data["chart_js_missing"] = True
+    else:
+        template_data["use_inline_chart"] = False
     
     # 渲染HTML
     template = Template(HTML_TEMPLATE)
@@ -871,7 +969,7 @@ def start_web_server(report_path, port=8080):
 def main():
     parser = argparse.ArgumentParser(description="向量搜索基准测试工具")
     parser.add_argument("--url", default="http://35.246.2.155:8000", help="API服务器URL")
-    parser.add_argument("--output", default="search_benchmark_report.html", help="输出HTML报告文件路径")
+    parser.add_argument("--output", default="./static/report/benchmark.html", help="输出HTML报告文件路径")
     parser.add_argument("--questions", nargs="+", help="要测试的问题列表")
     parser.add_argument("--file", help="包含问题列表的文件，每行一个问题")
     parser.add_argument("--limit", type=int, default=5, help="每个查询返回的最大结果数")

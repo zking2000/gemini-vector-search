@@ -147,6 +147,7 @@ logger.info(f"API指南目录路径: {api_guide_dir}")
 
 app.mount("/api-guide", StaticFiles(directory=api_guide_dir), name="api-guide")
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
+app.mount("/report", StaticFiles(directory=os.path.join(static_dir, "report")), name="report")
 
 # Include API routes
 app.include_router(router, tags=["API"])

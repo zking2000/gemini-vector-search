@@ -789,7 +789,7 @@ async def upload_file(
     # 如果header中提供了chunking_strategy，则覆盖查询参数
     if x_chunking_strategy:
         chunking_strategy = x_chunking_strategy
-        print(f"使用header中指定的分块策略: {chunking_strategy}")
+        print(f"使用header中指定的chunking_strategy: {chunking_strategy}")
     
     # 验证分块策略参数
     valid_strategies = ["fixed_size", "intelligent", "auto"]
@@ -842,60 +842,42 @@ async def upload_file(
                     raise HTTPException(status_code=400, detail=f"PDF文件损坏或不完整: {error_msg}")
                 else:
                     raise HTTPException(status_code=400, detail=f"无法读取PDF文件: {error_msg}")
-            
-            # 如果需要保留表格结构，使用pdftotext工具
-            if preserve_tables:
-                try:
-                    # 检查pdftotext是否可用
-                    try:
-                        subprocess.run(["which", "pdftotext"], check=True, capture_output=True)
-                    except:
-                        print("pdftotext工具不可用，仅使用基本文本提取")
-                        extracted_text = basic_text
-                        raise Exception("pdftotext工具不可用")
-                        
-                    # 使用pdftotext保留布局
-                    layout_text = subprocess.check_output(
-                        ["pdftotext", "-layout", temp_file_path, "-"],
-                        stderr=subprocess.DEVNULL
-                    ).decode("utf-8", errors="ignore")
-                    
-                    # 如果布局提取成功且文本量合理，使用它
-                    if layout_text and len(layout_text) >= len(basic_text) * 0.7:
-                        extracted_text = layout_text
-                        
-                        # 格式化表格文本，保留列对齐
-                        lines = extracted_text.split('\n')
-                        formatted_lines = []
-                        in_table = False
-                        
-                        for line in lines:
-                            # 检测表格行（含有多个空格序列的行）
-                            if '  ' in line and any(c.isdigit() or c.isalpha() for c in line):
-                                if not in_table:
-                                    formatted_lines.append("\n<TABLE>")
-                                    in_table = True
-                                # 替换连续空白为单个制表符以保持列分隔
-                                formatted_line = re.sub(r'\s{2,}', '\t', line)
-                                formatted_lines.append(formatted_line)
-                            else:
-                                if in_table:
-                                    formatted_lines.append("</TABLE>\n")
-                                    in_table = False
-                                formatted_lines.append(line)
-                        
-                        if in_table:
-                            formatted_lines.append("</TABLE>")
+                
+            # 尝试使用pdfplumber进行更高级的提取
+            try:
+                import pdfplumber
+                extracted_text = ""
+                with pdfplumber.open(temp_file_path) as pdf:
+                    for page in pdf.pages:
+                        try:
+                            # 处理表格（如果需要保留表格）
+                            if preserve_tables:
+                                tables = page.extract_tables()
+                                if tables:
+                                    for table in tables:
+                                        # 将表格格式化为文本
+                                        extracted_text += "<TABLE>\n"
+                                        for row in table:
+                                            row_text = "\t".join([str(cell) if cell else "" for cell in row])
+                                            extracted_text += row_text + "\n"
+                                        extracted_text += "</TABLE>\n\n"
                             
-                        extracted_text = '\n'.join(formatted_lines)
-                    else:
-                        extracted_text = basic_text
-                except Exception as e:
-                    print(f"布局保留提取失败: {e}")
-                    extracted_text = basic_text
-            else:
+                            # 提取页面文本
+                            page_text = page.extract_text() or ""
+                            if page_text:
+                                extracted_text += page_text + "\n\n"
+                        except Exception as e:
+                            print(f"使用pdfplumber处理页面时出错: {e}")
+                            continue
+            except Exception as e:
+                print(f"pdfplumber提取失败，使用基本提取文本: {e}")
                 extracted_text = basic_text
                 
+            # 如果两种方法都没有提取到文本，使用基本文本
+            if not extracted_text.strip():
+                print("pdfplumber没有提取到文本，使用PyPDF2提取的基本文本")
+                extracted_text = basic_text
+            
             # 如果使用OCR但文本提取为空，尝试OCR（需要实现）
             if use_ocr and not extracted_text.strip():
                 # 这里可以添加OCR处理代码
@@ -1086,7 +1068,7 @@ async def upload_file(
                     "source": file.filename,
                     "chunk": i+1,
                     "total_chunks": len(chunks),
-                    "strategy": chunking_strategy,
+                    "strategy": chunking_strategy,  # 确保策略正确传递
                     "chunk_size": chunk_size if chunking_strategy == "fixed_size" else None,
                     "overlap": chunk_overlap if chunking_strategy == "fixed_size" else None,
                     "file_type": file_ext.lstrip('.'),
@@ -1118,10 +1100,15 @@ async def upload_file(
                 if "import_timestamp" not in metadata:
                     metadata["import_timestamp"] = datetime.now().strftime("%Y%m%d%H%M%S")
                 
+                # 确保保留正确的分块策略
+                # 如果auto策略被具体的分块方法替换，确保在metadata中更新
+                if chunking_strategy != "auto":
+                    metadata["strategy"] = chunking_strategy
+                
                 processed_chunks.append({
                     "content": content,
                     "metadata": metadata,
-                    "chunking_strategy": chunking_strategy
+                    "chunking_strategy": chunking_strategy  # 明确传递用户指定的策略
                 })
             
             # 批量保存文档
