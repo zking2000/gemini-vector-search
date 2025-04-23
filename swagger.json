@@ -155,6 +155,11 @@
             "type": "string",
             "format": "date-time",
             "description": "Creation time"
+          },
+          "chunking_strategy": {
+            "type": "string",
+            "description": "The chunking strategy used for this document",
+            "enum": ["fixed_size", "intelligent"]
           }
         }
       },
@@ -382,6 +387,141 @@
             "type": "string",
             "format": "date-time",
             "description": "Operation time"
+          }
+        }
+      },
+      "StrategyComparisonResponse": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The original query text"
+          },
+          "comparison": {
+            "type": "object",
+            "properties": {
+              "fixed_size_results": {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "description": "Number of results returned using fixed size strategy"
+                  },
+                  "documents": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Document"
+                    },
+                    "description": "Documents found using fixed size strategy"
+                  },
+                  "avg_similarity": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "Average similarity score for fixed size results"
+                  },
+                  "max_similarity": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "Maximum similarity score for fixed size results"
+                  }
+                }
+              },
+              "intelligent_results": {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "description": "Number of results returned using intelligent strategy"
+                  },
+                  "documents": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Document"
+                    },
+                    "description": "Documents found using intelligent strategy"
+                  },
+                  "avg_similarity": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "Average similarity score for intelligent results"
+                  },
+                  "max_similarity": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "Maximum similarity score for intelligent results"
+                  }
+                }
+              },
+              "evaluation": {
+                "type": "string",
+                "description": "Evaluation of which strategy performed better"
+              }
+            }
+          },
+          "recommended_strategy": {
+            "type": "string",
+            "description": "The recommended strategy based on comparison results"
+          }
+        }
+      },
+      "DualChunkingResponse": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Name of the processed file"
+          },
+          "file_size": {
+            "type": "integer",
+            "description": "Size of the file in bytes"
+          },
+          "text_length": {
+            "type": "integer",
+            "description": "Total length of extracted text"
+          },
+          "fixed_size_chunks": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "description": "Number of chunks created using fixed size strategy"
+              },
+              "chunk_size": {
+                "type": "integer",
+                "description": "Size of each chunk in characters"
+              },
+              "overlap": {
+                "type": "integer",
+                "description": "Overlap size between chunks"
+              },
+              "doc_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "description": "IDs of documents created with fixed size chunking"
+              }
+            }
+          },
+          "intelligent_chunks": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "description": "Number of chunks created using intelligent strategy"
+              },
+              "doc_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "description": "IDs of documents created with intelligent chunking"
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "description": "Processing status"
           }
         }
       }
@@ -1028,6 +1168,179 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/upload-dual-chunking": {
+      "post": {
+        "summary": "上传使用双重分块策略的文档",
+        "description": "上传文档并同时使用固定尺寸分块和智能分块进行处理，方便后续比较不同策略的检索效果",
+        "operationId": "uploadDualChunking",
+        "tags": ["Document Management"],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "PDF文件"
+                  }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "fixed_chunk_size",
+            "in": "query",
+            "description": "固定尺寸分块的块大小",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1000
+            }
+          },
+          {
+            "name": "fixed_overlap",
+            "in": "query",
+            "description": "固定尺寸分块的重叠大小",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "文档处理成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DualChunkingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数无效或文件类型不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compare-strategies": {
+      "post": {
+        "summary": "比较不同分块策略的检索效果",
+        "description": "对同一个查询使用不同的分块策略进行检索，并对比结果",
+        "operationId": "compareSearchStrategies",
+        "tags": ["Document Retrieval"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "parameters": [
+          {
+            "name": "source_filter",
+            "in": "query",
+            "description": "按文档来源筛选结果",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "document1.pdf"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "每种策略返回的最大结果数",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "default": 5
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "策略比较结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyComparisonResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }

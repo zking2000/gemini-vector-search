@@ -1,15 +1,75 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Tuple, Union
 import json
 import numpy as np
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text, inspect
 from app.models.vector_models import Document
-from app.services.gemini_service import GeminiService
+from app.services.gemini_service import GeminiService, APIRateLimitError
+from app.services.db_service import DatabaseService
 import traceback
 from app.services.cache_service import cached
+import time
+import asyncio
+from functools import wraps
+from datetime import datetime
+from app.db.database import get_db
+import re
+
+# 添加限流控制器
+class RateLimiter:
+    """API请求限流器"""
+    
+    def __init__(self, max_requests: int, time_window: int):
+        """
+        初始化限流器
+        
+        Args:
+            max_requests: 时间窗口内允许的最大请求数
+            time_window: 时间窗口（秒）
+        """
+        self.max_requests = max_requests
+        self.time_window = time_window
+        self.request_timestamps = []
+        self._lock = asyncio.Lock()
+        
+    async def wait_if_needed(self) -> None:
+        """检查是否可以发出新请求，必要时等待"""
+        async with self._lock:
+            current_time = time.time()
+            
+            # 移除超出时间窗口的时间戳
+            self.request_timestamps = [t for t in self.request_timestamps 
+                                      if current_time - t <= self.time_window]
+            
+            # 检查是否达到请求限制
+            if len(self.request_timestamps) >= self.max_requests:
+                # 计算最早请求时间加上时间窗口后的过期时间
+                oldest_timestamp = min(self.request_timestamps)
+                wait_time = oldest_timestamp + self.time_window - current_time
+                
+                if wait_time > 0:
+                    print(f"API请求限流: 等待 {wait_time:.2f} 秒后继续")
+                    start_wait = datetime.now().strftime("%H:%M:%S")
+                    await asyncio.sleep(wait_time)
+                    end_wait = datetime.now().strftime("%H:%M:%S")
+                    print(f"限流等待结束 ({start_wait} -> {end_wait})")
+                    # 清理超时的请求
+                    current_time = time.time()
+                    self.request_timestamps = [t for t in self.request_timestamps 
+                                             if current_time - t <= self.time_window]
+            
+            # 记录新请求
+            self.request_timestamps.append(current_time)
+
+def rate_limited(func):
+    """对异步函数应用速率限制的装饰器"""
+    async def wrapper(self, *args, **kwargs):
+        await self._rate_limiter.wait_if_needed()
+        return await func(self, *args, **kwargs)
+    return wrapper
 
 class VectorService:
-    """Vector database service"""
+    """向量搜索服务，管理文档embedding和检索"""
     
     # Chinese to English keyword mapping for common terms
     # This helps bridging the gap between Chinese queries and English documents
@@ -36,8 +96,11 @@ class VectorService:
         # Add more mappings as needed
     }
     
-    def __init__(self):
-        self.gemini_service = GeminiService()
+    def __init__(self, db_service: DatabaseService, gemini_service: GeminiService):
+        self.db = db_service
+        self.gemini = gemini_service
+        self._search_cache = {}  # 搜索结果缓存
+        self._rate_limiter = RateLimiter(max_requests=50, time_window=60)  # 50个请求/分钟
     
     def _expand_chinese_query(self, query: str) -> str:
         """
@@ -74,7 +137,7 @@ class VectorService:
                         asyncio.set_event_loop(temp_loop)
                         try:
                             translation = temp_loop.run_until_complete(
-                                self.gemini_service.generate_completion(translate_prompt)
+                                self.gemini.generate_completion(translate_prompt)
                             )
                         finally:
                             temp_loop.close()
@@ -82,12 +145,12 @@ class VectorService:
                     else:
                         # Normal case, we can use the existing event loop
                         translation = loop.run_until_complete(
-                            self.gemini_service.generate_completion(translate_prompt)
+                            self.gemini.generate_completion(translate_prompt)
                         )
                 except RuntimeError:
                     # Likely no event loop exists in this thread
                     translation = asyncio.run(
-                        self.gemini_service.generate_completion(translate_prompt)
+                        self.gemini.generate_completion(translate_prompt)
                     )
                 
                 # Clean up the translation
@@ -110,14 +173,43 @@ class VectorService:
         
         return expanded_query
     
-    async def add_document(self, db: Session, content: str, metadata: Dict[str, Any] = None) -> Document:
-        """Add document to vector database"""
+    async def add_document(self, db: Session, content: str, metadata: Dict[str, Any] = None, chunking_strategy: str = None) -> Document:
+        """
+        Add a document to the database
+        
+        Args:
+            db: Database session
+            content: Document content
+            metadata: Document metadata
+            chunking_strategy: The chunking strategy used for this document ("fixed_size" or "intelligent")
+        
+        Returns:
+            Added document object
+        """
         try:
+            # 确保content是字符串类型
+            if content is None:
+                content = ""
+            elif isinstance(content, dict):
+                # 尝试转换字典为字符串
+                try:
+                    content = json.dumps(content)
+                    print(f"警告：content参数为字典类型，已自动转换为JSON字符串")
+                except Exception as e:
+                    raise ValueError(f"content参数必须是字符串类型，无法转换字典为JSON字符串: {e}")
+            elif not isinstance(content, str):
+                # 尝试进行通用转换
+                try:
+                    content = str(content)
+                    print(f"警告：content参数为{type(content).__name__}类型，已自动转换为字符串")
+                except Exception as e:
+                    raise ValueError(f"content参数必须是字符串类型，无法转换{type(content).__name__}类型: {e}")
+            
             # Generate embedding vector
-            embedding = await self.gemini_service.generate_embedding(content)
+            embedding = await self.gemini.generate_embedding(content)
             
             # Print debug information
-            print(f"Adding document: content length={len(content)}, metadata={metadata}")
+            print(f"Adding document: content length={len(content)}, metadata={metadata}, chunking_strategy={chunking_strategy}")
             print(f"Embedding vector length={len(embedding)}")
             
             # Check database table structure
@@ -146,7 +238,8 @@ class VectorService:
             # Create document object - don't specify id, let database generate it
             doc = Document(
                 title=title,
-                doc_metadata=doc_metadata_json
+                doc_metadata=doc_metadata_json,
+                chunking_strategy=chunking_strategy
             )
             
             # Save to database
@@ -177,18 +270,28 @@ class VectorService:
             raise
     
     @cached(ttl=24*3600)  # Cache for 24 hours
-    async def generate_embeddings(self, text, model_name="embedding-001"):
-        """
-        Generate vector embeddings for text, with cache support
+    @rate_limited
+    async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+        """生成文本的embedding向量
         
-        Parameters:
-            text: Text content
-            model_name: Embedding model name
+        Args:
+            texts: 文本列表
             
         Returns:
-            Vector representation of the text
+            embedding向量列表
         """
-        return await self.gemini_service.generate_embedding(text)
+        # 优化批处理大小，根据文本数量动态调整
+        total_texts = len(texts)
+        batch_size = 5  # 默认批次大小
+        
+        # 对大量文本优化批次大小
+        if total_texts > 100:
+            batch_size = 20
+        elif total_texts > 50:
+            batch_size = 10
+            
+        # 使用Gemini服务的批处理功能
+        return await self.gemini.generate_embeddings_batch(texts, batch_size)
     
     @cached(ttl=3600)  # Cache for 1 hour
     async def search_similar_chunks(self, db: Session, query: str, limit: int = 5, source_filter: str = None) -> List[Dict[str, Any]]:
@@ -225,7 +328,8 @@ class VectorService:
                 embedding_query = query
             
             # Generate embedding vector for query
-            query_embedding = await self.generate_embeddings(embedding_query)
+            embeddings = await self.generate_embeddings([embedding_query])
+            query_embedding = embeddings[0]
             query_dim = len(query_embedding)
             print(f"Query vector dimension: {query_dim}")
             
@@ -474,4 +578,398 @@ class VectorService:
         if norm_vec1 == 0 or norm_vec2 == 0:
             return 0
             
-        return dot_product / (norm_vec1 * norm_vec2) 
+        return dot_product / (norm_vec1 * norm_vec2)
+
+    @rate_limited
+    async def _compare_search_strategies_internal(self, db: Session, query: str, limit: int = 5, source_filter: Optional[str] = None) -> Dict:
+        """内部方法：比较不同分块策略的搜索效果
+        
+        Args:
+            db: 数据库会话
+            query: 搜索查询
+            limit: 返回结果数量
+            source_filter: 可选的来源过滤器
+            
+        Returns:
+            包含不同策略结果的比较字典
+        """
+        print(f"比较查询 '{query}' 的不同分块策略效果")
+        
+        # 生成查询向量
+        start_time = time.time()
+        query_embedding = await self.gemini.generate_embedding(query)
+        embedding_time = (time.time() - start_time) * 1000  # 毫秒
+        print(f"查询向量生成时间: {embedding_time:.2f}ms")
+        
+        # 定义要比较的策略
+        strategies = ["fixed_size", "intelligent"]
+        
+        # 为每个策略收集结果
+        results = {}
+        
+        for strategy in strategies:
+            start_time = time.time()
+            try:
+                # 根据策略和向量搜索文档
+                strategy_filter = f"metadata->>chunking_strategy = '{strategy}'"
+                if source_filter:
+                    combined_filter = f"({strategy_filter}) AND (metadata->>source LIKE '%{source_filter}%')"
+                else:
+                    combined_filter = strategy_filter
+                
+                # 执行搜索
+                print(f"使用 {strategy} 策略搜索...")
+                db_results = await self.db.search_documents(
+                    query_embedding, 
+                    limit=limit, 
+                    custom_filter=combined_filter
+                )
+                
+                # 测量时间
+                search_time = (time.time() - start_time) * 1000  # 毫秒
+                
+                # 为每个文档附加分数
+                documents = []
+                total_similarity = 0
+                
+                for doc in db_results:
+                    # 计算相似度分数
+                    similarity = self.cosine_similarity(query_embedding, doc.get("embedding", []))
+                    total_similarity += similarity
+                    
+                    document = {
+                        "id": doc.get("id"),
+                        "content": doc.get("content", "").strip(),
+                        "score": similarity,
+                        "metadata": doc.get("metadata", {})
+                    }
+                    documents.append(document)
+                
+                # 计算平均相似度
+                avg_similarity = total_similarity / len(documents) if documents else 0
+                
+                # 存储结果
+                results[strategy] = {
+                    "count": len(documents),
+                    "documents": documents,
+                    "avg_similarity": avg_similarity,
+                    "time_ms": search_time,
+                    "source_filter": source_filter,
+                    "strategy": strategy
+                }
+                
+                print(f"{strategy} 策略找到 {len(documents)} 个文档，用时 {search_time:.2f}ms，平均相似度 {avg_similarity:.4f}")
+                
+            except Exception as e:
+                print(f"{strategy} 策略搜索失败: {str(e)}")
+                results[strategy] = {
+                    "count": 0,
+                    "documents": [],
+                    "avg_similarity": 0,
+                    "time_ms": 0,
+                    "source_filter": source_filter,
+                    "strategy": strategy,
+                    "error": str(e)
+                }
+        
+        # 确定最佳策略
+        # 优先考虑：1) 有结果的策略；2) 平均相似度更高的策略；3) 如果相似度接近，考虑速度
+        best_strategy = None
+        best_score = -1
+        
+        for strategy in strategies:
+            if strategy not in results:
+                continue
+                
+            # 评分标准：相似度超过门槛值(0.75)的基础分，每个文档0.5分，相似度(0-1.0)乘以10，时间加成(最高1分)
+            strategy_results = results[strategy]
+            
+            # 如果没有结果或者相似度过低，给一个低分
+            if strategy_results["count"] == 0 or strategy_results["avg_similarity"] < 0.5:
+                strategy_score = 0
+            else:
+                # 计算时间加成 (越快越高，最高1分)
+                time_bonus = min(1.0, 2000 / max(strategy_results["time_ms"], 100))
+                
+                # 相似度加权
+                similarity_score = strategy_results["avg_similarity"] * 10
+                
+                # 文档数量加权 (每个文档0.5分，最高5分)
+                doc_count_score = min(5.0, strategy_results["count"] * 0.5)
+                
+                # 综合评分
+                strategy_score = similarity_score + doc_count_score + time_bonus
+            
+            # 更新最佳策略
+            if strategy_score > best_score:
+                best_score = strategy_score
+                best_strategy = strategy
+        
+        # 如果无法确定最佳策略，默认使用fixed_size
+        if best_strategy is None:
+            best_strategy = "fixed_size"
+            
+        # 评估原因
+        evaluation_reason = "无法确定评估原因"
+        if results[best_strategy]["count"] > 0:
+            if best_strategy == "intelligent":
+                if results["intelligent"]["avg_similarity"] > results["fixed_size"]["avg_similarity"]:
+                    evaluation_reason = "智能分块策略找到相似度更高的文档"
+                elif results["intelligent"]["count"] > results["fixed_size"]["count"]:
+                    evaluation_reason = "智能分块策略找到更多相关文档"
+                else:
+                    evaluation_reason = "智能分块策略综合表现更好"
+            else:
+                if results["fixed_size"]["avg_similarity"] > results["intelligent"]["avg_similarity"]:
+                    evaluation_reason = "固定分块策略找到相似度更高的文档"
+                elif results["fixed_size"]["count"] > results["intelligent"]["count"]:
+                    evaluation_reason = "固定分块策略找到更多相关文档"
+                elif results["fixed_size"]["time_ms"] < results["intelligent"]["time_ms"]:
+                    evaluation_reason = "固定分块策略检索速度更快"
+                else:
+                    evaluation_reason = "固定分块策略综合表现更好"
+        else:
+            evaluation_reason = "所有策略都未找到相关文档"
+        
+        # 创建与原始格式兼容的结构
+        response = {
+            "strategies": results,
+            "best_strategy": best_strategy,
+            "query": query,
+            "evaluation": {
+                "strategy": best_strategy,
+                "reason": evaluation_reason,
+                "scores": {
+                    "fixed_size": {
+                        "similarity": results["fixed_size"]["avg_similarity"],
+                        "count": results["fixed_size"]["count"],
+                        "time_ms": results["fixed_size"]["time_ms"]
+                    },
+                    "intelligent": {
+                        "similarity": results["intelligent"]["avg_similarity"],
+                        "count": results["intelligent"]["count"],
+                        "time_ms": results["intelligent"]["time_ms"]
+                    }
+                }
+            }
+        }
+        
+        return response
+
+    async def compare_search_strategies(self, query: str, limit: int = 5) -> Dict[str, Any]:
+        """比较不同的分块策略效果
+        
+        Args:
+            query: 搜索查询
+            limit: 限制返回结果数
+            
+        Returns:
+            比较结果数据
+        """
+        # 生成查询缓存键
+        cache_key = f"strategy_compare:{query}:{limit}"
+        
+        # 检查缓存
+        if cache_key in self._search_cache:
+            print(f"使用缓存的策略比较结果 - 查询: '{query}'")
+            return self._search_cache[cache_key]
+        
+        # 获取数据库会话
+        db = next(get_db())
+        
+        try:
+            # 执行比较
+            result = await self._compare_search_strategies_internal(db, query, limit)
+            
+            # 缓存结果
+            self._search_cache[cache_key] = result
+            
+            return result
+        except Exception as e:
+            print(f"比较搜索策略失败: {str(e)}")
+            traceback.print_exc()
+            
+            # 返回空结果结构
+            return {
+                "strategies": {
+                    "fixed_size": {
+                        "count": 0,
+                        "documents": [],
+                        "avg_similarity": 0,
+                        "time_ms": 0
+                    },
+                    "intelligent": {
+                        "count": 0,
+                        "documents": [],
+                        "avg_similarity": 0,
+                        "time_ms": 0
+                    }
+                },
+                "best_strategy": "fixed_size",
+                "query": query,
+                "evaluation": {
+                    "strategy": "fixed_size",
+                    "reason": "比较搜索策略时出错"
+                }
+            }
+
+    async def add_documents_batch(self, db: Session, documents: List[Dict], batch_size: int = 10) -> List[Dict]:
+        """批量添加文档，优化API调用
+        
+        根据文档总数自动调整批次大小，提供进度更新，并估计剩余时间
+        
+        Args:
+            db: 数据库会话
+            documents: 待添加的文档列表
+            batch_size: 每批次处理的文档数，默认10
+            
+        Returns:
+            成功添加的文档列表
+        """
+        start_time = time.time()
+        total_docs = len(documents)
+        processed_docs = 0
+        successful_docs = []
+        failed_docs = []
+        
+        # 根据总文档数自动调整批次大小
+        if total_docs > 1000:
+            batch_size = 50
+        elif total_docs > 500:
+            batch_size = 30
+        elif total_docs > 100:
+            batch_size = 20
+        elif total_docs > 50:
+            batch_size = 15
+        
+        print(f"开始批量处理 {total_docs} 个文档，批次大小: {batch_size}")
+        
+        batch_start_time = time.time()
+        batch_times = []
+        
+        # 分批处理文档
+        for i in range(0, total_docs, batch_size):
+            batch = documents[i:i + batch_size]
+            batch_count = len(batch)
+            
+            try:
+                # 生成嵌入向量
+                print(f"批次 {i//batch_size + 1}: 为 {batch_count} 个文档生成嵌入向量")
+                batch_texts = [doc.get('content', '') for doc in batch]
+                embeddings = await self.generate_embeddings(batch_texts)
+                
+                # 添加文档到数据库
+                for j, doc in enumerate(batch):
+                    try:
+                        if not doc.get('content'):
+                            print(f"警告: 跳过空内容文档 #{i + j + 1}")
+                            failed_docs.append({**doc, "error": "空内容"})
+                            continue
+                            
+                        doc_with_embedding = {
+                            **doc,
+                            "embedding": embeddings[j] if j < len(embeddings) else None
+                        }
+                        
+                        if doc_with_embedding["embedding"] is None:
+                            print(f"警告: 文档 #{i + j + 1} 嵌入向量生成失败")
+                            failed_docs.append({**doc, "error": "嵌入向量生成失败"})
+                            continue
+                        
+                        # 在这里使用传入的数据库会话
+                        added_doc = await self.db.add_document(
+                            db=db,
+                            content=doc_with_embedding.get('content', ''),
+                            embedding=doc_with_embedding.get('embedding'),
+                            metadata=doc_with_embedding.get('metadata', {}),
+                            chunking_strategy=doc_with_embedding.get('chunking_strategy', 'fixed_size')
+                        )
+                        
+                        successful_docs.append(added_doc)
+                        
+                    except Exception as e:
+                        print(f"添加文档 #{i + j + 1} 失败: {str(e)}")
+                        failed_docs.append({**doc, "error": str(e)})
+                
+                processed_docs += batch_count
+                
+                # 计算进度和估计剩余时间
+                batch_end_time = time.time()
+                batch_duration = batch_end_time - batch_start_time
+                batch_times.append(batch_duration)
+                
+                avg_batch_time = sum(batch_times) / len(batch_times)
+                remaining_batches = (total_docs - processed_docs) / batch_size
+                est_remaining_time = remaining_batches * avg_batch_time
+                
+                progress = (processed_docs / total_docs) * 100
+                print(f"进度: {progress:.1f}% ({processed_docs}/{total_docs})")
+                print(f"批次用时: {batch_duration:.2f}秒, 估计剩余时间: {est_remaining_time:.2f}秒")
+                
+                # 重置批次开始时间
+                batch_start_time = time.time()
+                
+                # 批次间添加小延迟，避免请求过于密集
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                print(f"处理批次失败: {str(e)}")
+                traceback.print_exc()
+                # 继续处理下一批
+        
+        total_duration = time.time() - start_time
+        print(f"批量处理完成，总用时: {total_duration:.2f}秒")
+        print(f"成功: {len(successful_docs)}, 失败: {len(failed_docs)}")
+        
+        return successful_docs
+
+    @rate_limited
+    async def search(self, query: str, limit: int = 5, source_filter: Optional[str] = None) -> List[Dict]:
+        """搜索相似文档，带速率限制
+        
+        Args:
+            query: 搜索查询
+            limit: 返回结果数量
+            source_filter: 可选的来源过滤器
+            
+        Returns:
+            相似文档列表
+        """
+        # 生成查询缓存键
+        cache_key = f"{query}:{limit}:{source_filter}"
+        
+        # 检查缓存
+        if cache_key in self._search_cache:
+            print("使用缓存的搜索结果")
+            return self._search_cache[cache_key]
+        
+        try:
+            # 生成查询向量
+            query_embedding = await self.gemini.generate_embedding(query)
+            
+            # 搜索向量数据库
+            results = await self.db.search_documents(
+                query_embedding, 
+                limit=limit,
+                source_filter=source_filter
+            )
+            
+            # 缓存结果
+            self._search_cache[cache_key] = results
+            return results
+            
+        except Exception as e:
+            print(f"搜索失败: {str(e)}")
+            return []
+
+    async def add_documents(self, db: Session, documents: List[Dict]) -> List[Dict]:
+        """将多个文档添加到数据库
+        
+        Args:
+            db: 数据库会话
+            documents: 要添加的文档列表，每个文档应包含 content 和可选的 metadata
+            
+        Returns:
+            成功添加的文档列表
+        """
+        return await self.add_documents_batch(db, documents, batch_size=10) 

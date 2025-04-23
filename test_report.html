@@ -1,0 +1,419 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>向量搜索基准测试报告</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f8fa;
+        }
+        h1, h2, h3 {
+            color: #0366d6;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        }
+        .query-card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            margin-bottom: 20px;
+            overflow: hidden;
+            transition: transform 0.2s;
+            position: relative;
+        }
+        .query-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .query-header {
+            padding: 15px 20px;
+            background-color: #f1f8ff;
+            border-bottom: 1px solid #e1e4e8;
+            position: relative;
+        }
+        .query-title {
+            font-weight: 600;
+            margin: 0;
+            color: #24292e;
+        }
+        .query-body {
+            padding: 20px;
+        }
+        .result-card {
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            padding: 15px;
+            background-color: #f6f8fa;
+        }
+        .result-card.fixed {
+            border-left: 4px solid #0366d6;
+        }
+        .result-card.intelligent {
+            border-left: 4px solid #28a745;
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        .result-meta {
+            font-size: 0.85em;
+            color: #586069;
+            margin-bottom: 10px;
+        }
+        .result-content {
+            background-color: #fff;
+            border: 1px solid #e1e4e8;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 0.9em;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        }
+        .highlights {
+            background-color: #fffbdd;
+            padding: 2px;
+            border-radius: 2px;
+        }
+        .summary {
+            margin-top: 30px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            padding: 20px;
+        }
+        .summary-header {
+            border-bottom: 1px solid #e1e4e8;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        .stat-card {
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            color: #586069;
+            text-align: center;
+        }
+        .better {
+            color: #28a745;
+        }
+        .worse {
+            color: #d73a49;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 0.75em;
+            font-weight: 600;
+            border-radius: 2em;
+            margin-left: 8px;
+        }
+        .badge.fixed {
+            background-color: #0366d680;
+            color: white;
+        }
+        .badge.intelligent {
+            background-color: #28a74580;
+            color: white;
+        }
+        .winner-label {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #ffdf1e;
+            color: #24292e;
+            padding: 3px 8px;
+            font-size: 0.7em;
+            border-radius: 2em;
+            font-weight: 600;
+        }
+        .comparison-chart {
+            margin-top: 20px;
+            height: 300px;
+        }
+        .chart-container {
+            margin-top: 20px;
+            height: 350px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            color: #586069;
+            font-size: 0.9em;
+        }
+        pre {
+            overflow-x: auto;
+            background-color: #f6f8fa;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #e1e4e8;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f6f8fa;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f6f8fa;
+        }
+        .page-navigation {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+        }
+        .page-nav-button {
+            background-color: #0366d6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .page-nav-button:disabled {
+            background-color: #c0c0c0;
+            cursor: not-allowed;
+        }
+        .chart-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+        @media (max-width: 768px) {
+            .summary-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <script src="chart.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>向量搜索分块策略基准测试报告</h1>
+        <p>生成时间: 2025-04-23 10:28:41</p>
+        <p>测试查询数量: 0</p>
+    </div>
+
+    <div class="summary">
+        <div class="summary-header">
+            <h2>执行结果摘要</h2>
+        </div>
+        <div class="summary-stats">
+            <div class="stat-card">
+                <div class="stat-label">总查询数</div>
+                <div class="stat-value">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">固定分块策略胜出</div>
+                <div class="stat-value">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">智能分块策略胜出</div>
+                <div class="stat-value">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">固定分块平均相似度</div>
+                <div class="stat-value">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">智能分块平均相似度</div>
+                <div class="stat-value">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">固定分块平均处理时间</div>
+                <div class="stat-value">0ms</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">智能分块平均处理时间</div>
+                <div class="stat-value">0ms</div>
+            </div>
+        </div>
+
+        <div class="chart-wrapper">
+            <h3>分块策略胜出比例</h3>
+            <div class="chart-container" style="width:50%; height:300px;">
+                <canvas id="winsChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-wrapper">
+            <h3>查询相似度比较</h3>
+            <div class="chart-container">
+                <canvas id="similarityChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-wrapper">
+            <h3>查询处理时间比较</h3>
+            <div class="chart-container">
+                <canvas id="timeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <h2>查询详细结果</h2>
+    
+
+    <div class="footer">
+        <p>© 2025 向量搜索基准测试报告 | 生成于 2025-04-23 10:28:41</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 胜出比例饼图
+            const winsCtx = document.getElementById('winsChart').getContext('2d');
+            new Chart(winsCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['固定分块策略', '智能分块策略'],
+                    datasets: [{
+                        data: [0, 0],
+                        backgroundColor: ['rgba(3, 102, 214, 0.6)', 'rgba(40, 167, 69, 0.6)'],
+                        borderColor: ['rgba(3, 102, 214, 1)', 'rgba(40, 167, 69, 1)'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // 相似度比较图
+            const similarityCtx = document.getElementById('similarityChart').getContext('2d');
+            new Chart(similarityCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '固定分块相似度',
+                        data: [],
+                        backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                        borderColor: 'rgba(3, 102, 214, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: '智能分块相似度',
+                        data: [],
+                        backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                        borderColor: 'rgba(40, 167, 69, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    const index = context[0].dataIndex;
+                                    return "[]".split(",")[index].query;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            min: 0.7,
+                            max: 1
+                        }
+                    }
+                }
+            });
+
+            // 处理时间比较图
+            const timeCtx = document.getElementById('timeChart').getContext('2d');
+            new Chart(timeCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '固定分块处理时间 (ms)',
+                        data: [],
+                        backgroundColor: 'rgba(3, 102, 214, 0.6)',
+                        borderColor: 'rgba(3, 102, 214, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: '智能分块处理时间 (ms)',
+                        data: [],
+                        backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                        borderColor: 'rgba(40, 167, 69, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // 各查询的对比图
+            
+        });
+    </script>
+</body>
+</html>

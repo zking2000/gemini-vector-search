@@ -11,6 +11,7 @@ class Document(Base):
     title = Column(String(255), nullable=False)  # Replaced content with title
     doc_metadata = Column(Text, nullable=True)  # Can be stored as JSON string, including original metadata and embedding
     created_at = Column(DateTime, server_default=func.now())
+    chunking_strategy = Column(String(50), nullable=True)  # 新增字段：chunking策略（fixed_size或intelligent）
     # If there's no updated_at column in the database table, remove it
 
     def __repr__(self):

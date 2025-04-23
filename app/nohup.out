@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/home/stephen_h_zhou/temp/gemini-vector-search/app/main.py", line 7, in <module>
+    from fastapi import FastAPI, HTTPException, Request
+ModuleNotFoundError: No module named 'fastapi'

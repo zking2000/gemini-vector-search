@@ -464,3 +464,80 @@ In the development of this Gemini Vector Search System, we referenced the follow
 
 - [Vector Database Design Patterns](https://www.singlestore.com/blog/vector-database-design-patterns/)
 - [Building High-Performance RAG System Architecture](https://www.databricks.com/blog/llm-rag-platform-upgrade-how-build-high-accuracy-retrieval-augmented-generation-applications)
+
+## 新增功能说明
+
+### 双重分块策略实现
+
+本系统现已支持两种文档分块（chunking）策略，并能够对比不同策略的检索效果：
+
+#### 1. 固定尺寸分块（Fixed-size Chunking）
+
+- 使用预设的固定尺寸（默认1000字符）和重叠区域（默认200字符）进行文档分块
+- 简单高效，适用于结构均匀的文档
+- 通过 `chunking_strategy = "fixed_size"` 标识
+
+#### 2. 智能分析分块（Intelligent Chunking）
+
+- 使用Gemini模型分析文档结构，智能确定最佳分块策略
+- 根据文档的段落、章节和语义结构自适应调整分块
+- 对复杂文档和特殊格式有更好的处理效果
+- 通过 `chunking_strategy = "intelligent"` 标识
+
+### 使用方法
+
+#### 上传具有双重分块的文档
+
+```
+POST /api/v1/upload-dual-chunking
+```
+
+此API接受文档上传，并同时使用固定尺寸分块和智能分块两种策略处理同一文档，将处理结果存入数据库。支持以下参数：
+
+- `file`: 要上传的文件（目前支持PDF）
+- `fixed_chunk_size`: 固定尺寸分块的块大小（默认1000）
+- `fixed_overlap`: 固定尺寸分块的重叠大小（默认200）
+
+#### 比较不同分块策略的检索效果
+
+```
+POST /api/v1/compare-strategies
+```
+
+此API对同一查询使用不同的分块策略进行检索，并对比结果。支持以下参数：
+
+- `query`: 查询文本
+- `source_filter`: 可选的文档来源筛选条件
+- `limit`: 每种策略返回的最大结果数
+
+### 响应示例
+
+比较策略API返回结果示例：
+
+```json
+{
+  "query": "人工智能的发展趋势",
+  "comparison": {
+    "fixed_size_results": {
+      "count": 3,
+      "documents": [...],
+      "avg_similarity": 0.76,
+      "max_similarity": 0.82
+    },
+    "intelligent_results": {
+      "count": 4,
+      "documents": [...],
+      "avg_similarity": 0.79,
+      "max_similarity": 0.85
+    },
+    "evaluation": "智能chunking在此查询中表现更好"
+  },
+  "recommended_strategy": "智能chunking在此查询中表现更好"
+}
+```
+
+### 优势与应用场景
+
+1. **研究与评估**：通过对比分析不同chunking策略的检索效果，可以针对特定领域或文档类型选择最佳策略
+2. **混合检索**：系统可以同时从不同策略的分块中检索答案，提高检索质量
+3. **自适应处理**：对结构复杂的文档采用智能分块，对简单文档采用固定尺寸分块，平衡效果与效率
