@@ -634,14 +634,27 @@ class VectorService:
                     limit=limit
                 )
                 
+                # 调试输出：检查search_documents_by_strategy返回的结果格式
+                print(f"search_documents_by_strategy返回结果数: {len(db_results)}")
+                if db_results:
+                    first_doc = db_results[0]
+                    print(f"第一个文档数据结构: {list(first_doc.keys())}")
+                    # 检查嵌入向量字段存在哪里
+                    if "score" in first_doc:
+                        print(f"score值: {first_doc.get('score')}")
+                    
+                    metadata = first_doc.get("metadata", {})
+                    print(f"元数据字段: {list(metadata.keys())}")
+                
                 # 如果需要source_filter，在Python中进一步过滤
                 if source_filter and db_results:
-                    db_results = [
+                    filtered_results = [
                         doc for doc in db_results 
                         if doc.get("metadata", {}).get("source", "").lower().find(source_filter.lower()) != -1
                     ]
+                    print(f"应用source_filter后，结果从 {len(db_results)} 减少到 {len(filtered_results)}")
                     # 确保结果数不超过limit
-                    db_results = db_results[:limit]
+                    db_results = filtered_results[:limit]
                 
                 # 测量时间
                 search_time = (time.time() - start_time) * 1000  # 毫秒

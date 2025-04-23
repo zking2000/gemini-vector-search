@@ -282,7 +282,8 @@ class DatabaseService:
                             "content": row.title,
                             "metadata": cleaned_metadata,
                             "score": similarity,
-                            "chunking_strategy": strategy
+                            "chunking_strategy": strategy,
+                            "embedding": doc_embedding  # 添加embedding向量以便外部代码访问
                         })
                 except Exception as e:
                     print(f"处理文档id={row.id}时出错: {e}")
