@@ -137,7 +137,58 @@ sequenceDiagram
     GS-->>API: 12. Return generated answer
     API-->>Client: 13. Return query results
 ```
+## Sub Processing
+```mermaid
+sequenceDiagram
+    participant Client as User
+    participant API
+    participant GS as GeminiService
+    participant VS as VectorService
+    participant DB as Database
+    
+    %% Document upload flow
+    Note over Client,DB: Document Upload Flow
+    Client->>API: 1. Upload PDF document
+    API->>GS: 2. Call intelligent chunking
+    GS-->>API: 3. Return document chunks
+    
+    loop For each document chunk
+        API->>GS: 4a. Generate embedding vector
+        GS-->>API: 4b. Return embedding vector
+        API->>VS: 4c. Add document and vector to database
+        VS->>DB: 4d. Store document and vector
+        DB-->>VS: 4e. Storage confirmation
+        VS-->>API: 4f. Processing complete
+    end
+    API-->>Client: 5. Upload success response
+```
 
+```mermaid
+sequenceDiagram
+    participant Client as User
+    participant API
+    participant GS as GeminiService
+    participant VS as VectorService
+    participant DB as Database
+    
+    %% Query flow
+    Note over Client,DB: Query Processing Flow
+    Client->>API: 1. Send query request
+    API->>GS: 2. Generate query embedding vector
+    GS-->>API: 3. Return query vector
+    
+    API->>VS: 4. Search similar documents
+    VS->>DB: 5. Retrieve documents
+    DB-->>VS: 6. Return document set
+    VS->>VS: 7. Calculate similarity and sort
+    VS-->>API: 8. Return relevant documents
+    
+    API->>GS: 9. Prepare context
+    GS-->>API: 10. Return formatted context
+    API->>GS: 11. Generate answer
+    GS-->>API: 12. Return generated answer
+    API-->>Client: 13. Return query results
+```
 ## Code Structure
 
 ```mermaid
