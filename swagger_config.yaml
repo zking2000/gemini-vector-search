@@ -1,0 +1,776 @@
+openapi: 3.0.0
+info:
+  title: Gemini Vector Search API
+  description: |
+    API for document processing, vector search, and Gemini integration.
+    提供文档处理、向量搜索和Gemini集成的API接口。
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+    description: 生产服务器
+
+tags:
+  - name: vector-service
+    description: 向量搜索相关接口
+  - name: document-service
+    description: 文档管理相关接口
+  - name: gemini-service
+    description: Gemini AI相关接口
+  - name: benchmark
+    description: 基准测试相关接口
+
+paths:
+  /api/v1/health:
+    get:
+      tags:
+        - system
+      summary: API健康检查
+      description: 检查API服务是否正常运行
+      responses:
+        '200':
+          description: 服务正常运行
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/v1/database-status:
+    get:
+      tags:
+        - system
+      summary: 数据库连接状态
+      description: 检查数据库连接是否正常
+      responses:
+        '200':
+          description: 数据库连接正常
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "connected"
+                  timestamp:
+                    type: string
+                    format: date-time
+        '500':
+          description: 数据库连接失败
+
+  /api/v1/embedding:
+    post:
+      tags:
+        - vector-service
+      summary: 生成文本嵌入向量
+      description: 将文本转换为向量表示用于向量检索
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - text
+              properties:
+                text:
+                  type: string
+                  description: 要转换的文本
+      responses:
+        '200':
+          description: 成功生成嵌入向量
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  embedding:
+                    type: array
+                    items:
+                      type: number
+                      format: float
+        '500':
+          description: 生成嵌入向量失败
+
+  /api/v1/completion:
+    post:
+      tags:
+        - gemini-service
+      summary: 生成文本补全
+      description: 使用Gemini模型生成文本补全，可选择使用向量数据库中的相关文档作为上下文
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - prompt
+              properties:
+                prompt:
+                  type: string
+                  description: 提示文本
+                use_context:
+                  type: boolean
+                  description: 是否使用上下文
+                  default: false
+                context_query:
+                  type: string
+                  description: 上下文查询文本
+                max_context_docs:
+                  type: integer
+                  description: 最大上下文文档数
+                  default: 5
+                model_complexity:
+                  type: string
+                  description: 模型复杂度
+                  enum: [simple, normal, complex]
+                  default: normal
+                disable_cache:
+                  type: boolean
+                  description: 是否禁用缓存
+                  default: false
+      responses:
+        '200':
+          description: 成功生成文本补全
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  completion:
+                    type: string
+        '500':
+          description: 生成文本补全失败
+
+  /api/v1/documents:
+    post:
+      tags:
+        - document-service
+      summary: 添加文档
+      description: 向向量数据库添加单个文档，生成其嵌入向量用于后续检索
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  description: 文档内容
+                metadata:
+                  type: object
+                  description: 文档元数据
+      responses:
+        '200':
+          description: 成功添加文档
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  content:
+                    type: string
+                  metadata:
+                    type: object
+        '500':
+          description: 添加文档失败
+    get:
+      tags:
+        - document-service
+      summary: 获取文档列表
+      description: 获取文档列表，支持分页和源过滤
+      parameters:
+        - name: limit
+          in: query
+          description: 返回的最大文档数量
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          description: 分页查询的偏移量
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: source
+          in: query
+          description: 按文档源过滤，例如特定的PDF文件名
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功获取文档列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        title:
+                          type: string
+                        content:
+                          type: string
+                        metadata:
+                          type: object
+                        created_at:
+                          type: string
+                          format: date-time
+                  total:
+                    type: integer
+        '500':
+          description: 获取文档列表失败
+
+  /api/v1/query:
+    post:
+      tags:
+        - vector-service
+      summary: 查询相似文档
+      description: 在向量数据库中搜索与查询文本相似的文档，并返回详细信息
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  description: 查询文本
+                limit:
+                  type: integer
+                  description: 返回的最大文档数量
+                  default: 5
+      parameters:
+        - name: source_filter
+          in: query
+          description: 按文档源过滤结果
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功查询相似文档
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+        '500':
+          description: 查询相似文档失败
+
+  /api/v1/integration:
+    post:
+      tags:
+        - gemini-service
+      summary: 集成查询
+      description: 集成API，结合向量检索和文本生成，可按文档源过滤结果并返回详细调试信息
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - prompt
+              properties:
+                prompt:
+                  type: string
+                  description: 提示文本
+                use_context:
+                  type: boolean
+                  description: 是否使用上下文
+                  default: true
+                context_query:
+                  type: string
+                  description: 上下文查询文本
+                max_context_docs:
+                  type: integer
+                  description: 最大上下文文档数
+                  default: 5
+                model_complexity:
+                  type: string
+                  description: 模型复杂度
+                  enum: [simple, normal, complex]
+                  default: normal
+      parameters:
+        - name: source_filter
+          in: query
+          description: 按文档源过滤结果
+          schema:
+            type: string
+        - name: debug
+          in: query
+          description: 是否返回详细调试信息
+          schema:
+            type: boolean
+            default: false
+        - name: force_use_documents
+          in: query
+          description: 即使没有找到高相似度匹配也强制使用文档内容回答
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 成功生成集成查询答案
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  completion:
+                    type: string
+                  debug_info:
+                    type: object
+        '500':
+          description: 集成查询失败
+
+  /api/v1/upload_pdf:
+    post:
+      operationId: uploadPdf
+      summary: 上传和处理PDF文件
+      description: 上传PDF文件，解析内容并存储到向量数据库，支持智能分块
+      tags:
+        - 文档管理
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF文件
+                preserve_tables:
+                  type: boolean
+                  description: 是否保留表格结构
+                  default: true
+                use_ocr:
+                  type: boolean
+                  description: 是否使用OCR处理扫描文档
+                  default: false
+                chunking_strategy:
+                  type: string
+                  description: 分块策略 'fixed_size', 'intelligent' 或 'auto'
+                  default: auto
+                  enum:
+                    - fixed_size
+                    - intelligent
+                    - auto
+                chunk_size:
+                  type: integer
+                  description: 固定分块尺寸
+                  default: 1000
+                chunk_overlap:
+                  type: integer
+                  description: 固定分块重叠大小
+                  default: 200
+                save_to_database:
+                  type: boolean
+                  description: 是否保存到数据库
+                  default: true
+              required:
+                - file
+      responses:
+        '200':
+          description: 成功处理PDF文件
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  filename:
+                    type: string
+                    description: 上传的文件名
+                  text_chunks:
+                    type: array
+                    description: 文本块数组或内容长度
+                  chunk_strategy:
+                    type: string
+                    description: 使用的分块策略
+                  document_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: 添加到数据库的文档ID
+        '400':
+          description: 无效请求或不受支持的文件类型
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+        '500':
+          description: 服务器处理错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+
+  /api/v1/upload_file:
+    post:
+      operationId: uploadFile
+      summary: 上传和处理各种文件
+      description: 上传各种文件(PDF、TXT、DOCX、CSV等)，解析内容并存储到向量数据库，支持智能分块
+      tags:
+        - 文档管理
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 要上传的文件（支持PDF、TXT、DOCX、CSV等）
+                preserve_tables:
+                  type: boolean
+                  description: 是否保留表格结构
+                  default: true
+                use_ocr:
+                  type: boolean
+                  description: 是否使用OCR处理扫描文档
+                  default: false
+                chunking_strategy:
+                  type: string
+                  description: 分块策略 'fixed_size', 'intelligent' 或 'auto'
+                  default: auto
+                  enum:
+                    - fixed_size
+                    - intelligent
+                    - auto
+                chunk_size:
+                  type: integer
+                  description: 固定分块尺寸
+                  default: 1000
+                chunk_overlap:
+                  type: integer
+                  description: 固定分块重叠大小
+                  default: 200
+                save_to_database:
+                  type: boolean
+                  description: 是否保存到数据库
+                  default: true
+              required:
+                - file
+      responses:
+        '200':
+          description: 成功处理文件
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  filename:
+                    type: string
+                    description: 上传的文件名
+                  text_chunks:
+                    type: array
+                    description: 文本块数组或内容长度
+                  chunk_strategy:
+                    type: string
+                    description: 使用的分块策略
+                  document_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: 添加到数据库的文档ID
+        '400':
+          description: 无效请求或不受支持的文件类型
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+        '500':
+          description: 服务器处理错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+
+  /api/v1/analyze-documents:
+    post:
+      tags:
+        - gemini-service
+      summary: 分析文档内容
+      description: 深度分析文档内容，提取关键概念和主题
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  description: 查询文本
+                limit:
+                  type: integer
+                  description: 返回的最大文档数量
+                  default: 5
+      responses:
+        '200':
+          description: 成功分析文档
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  completion:
+                    type: string
+        '500':
+          description: 分析文档失败
+
+  /api/v1/clear-alloydb:
+    post:
+      tags:
+        - system
+      summary: 清除AlloyDB
+      description: 清除AlloyDB中的所有数据表，这是一个危险操作，需要确认参数
+      parameters:
+        - name: confirmation
+          in: query
+          required: true
+          description: 确认字符串，必须为'confirm_clear_alloydb'
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功清除AlloyDB
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  deleted_tables:
+                    type: integer
+                  table_counts:
+                    type: object
+                  timestamp:
+                    type: string
+                    format: date-time
+        '400':
+          description: 确认参数不正确
+        '500':
+          description: 清除操作失败
+
+  /api/v1/documents/{document_id}:
+    get:
+      tags:
+        - document-service
+      summary: 获取单个文档
+      description: 根据ID获取单个文档的详细信息
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          description: 文档ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功获取文档
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  title:
+                    type: string
+                  content:
+                    type: string
+                  metadata:
+                    type: object
+                  created_at:
+                    type: string
+                    format: date-time
+        '404':
+          description: 文档不存在
+        '500':
+          description: 获取文档失败
+    delete:
+      tags:
+        - document-service
+      summary: 删除文档
+      description: 从数据库中删除指定文档
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          description: 文档ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功删除文档
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  deleted_records:
+                    type: integer
+        '404':
+          description: 文档不存在
+        '500':
+          description: 删除文档失败
+
+  /api/v1/upload-dual-chunking:
+    post:
+      tags:
+        - document-service
+      summary: 上传使用双重分块策略的文档
+      description: 上传文档并同时使用固定尺寸分块和智能分块进行处理，方便后续比较不同策略的检索效果
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 要上传的文件
+                fixed_chunk_size:
+                  type: integer
+                  description: 固定尺寸分块的块大小
+                  default: 1000
+                fixed_overlap:
+                  type: integer
+                  description: 固定尺寸分块的重叠大小
+                  default: 200
+      responses:
+        '200':
+          description: 成功上传和处理文档
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  filename:
+                    type: string
+                  file_size:
+                    type: integer
+                  text_length:
+                    type: integer
+                  fixed_size_chunks:
+                    type: object
+                  intelligent_chunks:
+                    type: object
+                  status:
+                    type: string
+        '400':
+          description: 不支持的文件类型
+        '500':
+          description: 处理文件失败
+
+  /api/v1/compare-strategies:
+    post:
+      tags:
+        - benchmark
+      summary: 比较不同分块策略的检索效果
+      description: 对同一个查询使用不同的分块策略进行检索，并对比结果
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  description: 查询文本
+                limit:
+                  type: integer
+                  description: 返回的最大文档数量
+                  default: 5
+      responses:
+        '200':
+          description: 成功比较不同策略
+          content:
+            application/json:
+              schema:
+                type: object
+        '500':
+          description: 比较策略失败
+
+  /api/v1/benchmark:
+    get:
+      tags:
+        - benchmark
+      summary: 向量搜索基准测试页面
+      description: 提供向量搜索基准测试的Web界面，可以运行测试并查看结果
+      parameters:
+        - name: run_test
+          in: query
+          description: 是否执行基准测试
+          schema:
+            type: boolean
+            default: false
+        - name: questions
+          in: query
+          description: 测试问题，用分号分隔
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: 每个查询返回的最大结果数
+          schema:
+            type: integer
+            default: 5
+        - name: source_filter
+          in: query
+          description: 源文档过滤条件
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功返回基准测试页面或结果
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: 运行基准测试失败 

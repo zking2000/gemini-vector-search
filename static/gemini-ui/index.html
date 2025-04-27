@@ -5,7 +5,7 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Smart RAG Platform</title>
-    <meta name="description" content="基于Google Gemini 2.0 Flash模型的智能文档检索与问答系统" />
+    <meta name="description" content="基于Google Gemini 2.5 Pro模型的智能文档检索与问答系统" />
     <style>
       /* 全局强制水平显示 */
       * {
@@ -21,11 +21,16 @@
         direction: ltr !important;
         text-align: left !important;
       }
+      /* 隐藏基准测试报告链接 */
+      .benchmark-link {
+        display: none !important;
+      }
     </style>
     <link rel="stylesheet" href="/css/main.css" />
   </head>
   <body>
     <div id="root"></div>
+    <a href="/report_benchmark_redirect.html" class="benchmark-link">基准测试报告</a>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html> 

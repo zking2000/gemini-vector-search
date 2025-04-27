@@ -1,13 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Input, Button, Card, Spin, Typography, Select, Switch, Space, Divider, List, Avatar, Empty, Alert, Badge } from 'antd';
-import { SendOutlined, RobotOutlined, UserOutlined, FileTextOutlined, DeleteOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { Input, Button, Card, Spin, Typography, Select, Switch, Space, Divider, List, Avatar, Empty, Alert, Badge, Dropdown, Modal, message } from 'antd';
+import { SendOutlined, RobotOutlined, UserOutlined, FileTextOutlined, DeleteOutlined, InfoCircleOutlined, DownloadOutlined, UploadOutlined, MoreOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import { saveAs } from 'file-saver';
+import { useTranslation } from 'react-i18next';
 
 const { TextArea } = Input;
 const { Title, Paragraph, Text } = Typography;
 const { Option } = Select;
 
 const QueryAssistant = () => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [conversations, setConversations] = useState([]);
@@ -32,6 +35,79 @@ const QueryAssistant = () => {
 
     fetchSources();
   }, []);
+
+  // 加载本地存储中的对话历史
+  useEffect(() => {
+    try {
+      const savedConversations = localStorage.getItem('assistantConversations');
+      if (savedConversations) {
+        setConversations(JSON.parse(savedConversations));
+      }
+      
+      // 从localStorage加载其他设置
+      const savedSettings = localStorage.getItem('assistantSettings');
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        if (settings.selectedSource) setSelectedSource(settings.selectedSource);
+        if (settings.useContext !== undefined) setUseContext(settings.useContext);
+        if (settings.maxContextDocs) setMaxContextDocs(settings.maxContextDocs);
+        if (settings.forceUseDocuments !== undefined) setForceUseDocuments(settings.forceUseDocuments);
+      }
+    } catch (error) {
+      console.error('加载对话历史失败:', error);
+    }
+  }, []);
+
+  // 保存对话到本地存储
+  useEffect(() => {
+    try {
+      if (conversations.length > 0) {
+        // 如果对话太多，保留最近的50条
+        const conversationsToSave = conversations.length > 50 
+          ? conversations.slice(-50) 
+          : conversations;
+        
+        localStorage.setItem('assistantConversations', JSON.stringify(conversationsToSave));
+      }
+    } catch (error) {
+      console.error('保存对话历史失败:', error);
+      // 如果是存储空间不足的错误，尝试只保存最近的10条对话
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        try {
+          const reducedConversations = conversations.slice(-10);
+          localStorage.setItem('assistantConversations', JSON.stringify(reducedConversations));
+          
+          // 显示提示消息
+          setConversations(prev => [
+            ...prev,
+            {
+              role: 'system',
+              content: '由于浏览器存储空间限制，只保留了最近10条对话记录',
+              isError: false,
+              timestamp: new Date().toISOString()
+            }
+          ]);
+        } catch (e) {
+          console.error('即使减少对话量也无法保存:', e);
+        }
+      }
+    }
+  }, [conversations]);
+
+  // 保存设置到本地存储
+  useEffect(() => {
+    try {
+      const settings = {
+        selectedSource,
+        useContext,
+        maxContextDocs,
+        forceUseDocuments
+      };
+      localStorage.setItem('assistantSettings', JSON.stringify(settings));
+    } catch (error) {
+      console.error('保存设置失败:', error);
+    }
+  }, [selectedSource, useContext, maxContextDocs, forceUseDocuments]);
 
   // 自动滚动到底部
   useEffect(() => {
@@ -115,6 +191,90 @@ const QueryAssistant = () => {
 
   const clearConversation = () => {
     setConversations([]);
+    // 清除本地存储中的对话历史
+    localStorage.removeItem('assistantConversations');
+  };
+
+  // 导出对话历史
+  const exportConversations = () => {
+    try {
+      if (conversations.length === 0) {
+        message.warning('没有对话可导出');
+        return;
+      }
+
+      const exportData = {
+        conversations,
+        settings: {
+          selectedSource,
+          useContext,
+          maxContextDocs,
+          forceUseDocuments
+        },
+        exportDate: new Date().toISOString()
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      saveAs(blob, `对话记录_${timestamp}.json`);
+      message.success('对话导出成功');
+    } catch (error) {
+      console.error('导出对话失败:', error);
+      message.error('导出对话失败');
+    }
+  };
+
+  // 导入对话控制
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const showImportModal = () => {
+    setImportModalVisible(true);
+  };
+
+  const handleImport = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedData = JSON.parse(e.target.result);
+        
+        if (Array.isArray(importedData.conversations)) {
+          setConversations(importedData.conversations);
+          
+          // 导入设置
+          if (importedData.settings) {
+            if (importedData.settings.selectedSource) setSelectedSource(importedData.settings.selectedSource);
+            if (importedData.settings.useContext !== undefined) setUseContext(importedData.settings.useContext);
+            if (importedData.settings.maxContextDocs) setMaxContextDocs(importedData.settings.maxContextDocs);
+            if (importedData.settings.forceUseDocuments !== undefined) setForceUseDocuments(importedData.settings.forceUseDocuments);
+          }
+          
+          message.success('对话导入成功');
+        } else {
+          message.error('导入的文件格式不正确');
+        }
+      } catch (error) {
+        console.error('导入对话失败:', error);
+        message.error('导入对话失败，文件格式不正确');
+      }
+      
+      // 重置文件输入
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setImportModalVisible(false);
+    };
+    
+    reader.readAsText(file);
   };
 
   const renderMessage = (message) => {
@@ -182,7 +342,7 @@ const QueryAssistant = () => {
         {message.contextDocuments && message.contextDocuments.length > 0 && (
           <div style={{ marginTop: 8, maxWidth: '70%', overflowWrap: 'break-word', wordWrap: 'break-word' }} className="document-reference">
             <Text type="secondary" style={{ fontSize: 12, writingMode: 'horizontal-tb', display: 'block' }}>
-              <InfoCircleOutlined /> 参考文档:
+              <InfoCircleOutlined /> {t('queryAssistant.referenceDocument')}:
             </Text>
             <List
               size="small"
@@ -213,7 +373,7 @@ const QueryAssistant = () => {
                           maxWidth: '150px',
                           whiteSpace: 'nowrap'
                         }}>
-                          {doc.source || (doc.metadata?.source || doc.metadata?.pdf_filename || `文档片段 #${index+1}`)}
+                          {doc.source || (doc.metadata?.source || doc.metadata?.pdf_filename || `${t('queryAssistant.documentFragment')} #${index+1}`)}
                         </div>
                         {doc.similarity && 
                           <div className="similarity-badge" style={{
@@ -245,7 +405,7 @@ const QueryAssistant = () => {
             />
             {message.contextDocuments.length > 3 && (
               <Text type="secondary" style={{ fontSize: 12, display: 'block', textAlign: 'center' }}>
-                还有 {message.contextDocuments.length - 3} 个参考文档
+                {t('queryAssistant.additionalDocuments', { count: message.contextDocuments.length - 3 })}
               </Text>
             )}
           </div>
@@ -263,15 +423,37 @@ const QueryAssistant = () => {
       flexDirection: 'column'
     }}>
       <Card 
-        title={<Title level={4}>智能查询助手</Title>}
+        title={<Title level={4}>{t('queryAssistant.title')}</Title>}
         extra={
-          <Button 
-            type="text" 
-            icon={<DeleteOutlined />} 
-            onClick={clearConversation}
-          >
-            清空对话
-          </Button>
+          <Space>
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: '1',
+                    icon: <DeleteOutlined />,
+                    label: t('queryAssistant.clearChat'),
+                    onClick: clearConversation
+                  },
+                  {
+                    key: '2',
+                    icon: <DownloadOutlined />,
+                    label: t('common.download'),
+                    onClick: exportConversations
+                  },
+                  {
+                    key: '3',
+                    icon: <UploadOutlined />,
+                    label: t('common.upload'),
+                    onClick: showImportModal
+                  }
+                ]
+              }}
+              placement="bottomRight"
+            >
+              <Button type="text" icon={<MoreOutlined />}>{t('common.more')}</Button>
+            </Dropdown>
+          </Space>
         }
         bordered={false}
         style={{ 
@@ -302,34 +484,34 @@ const QueryAssistant = () => {
               style={{ width: 200 }}
               value={selectedSource}
               onChange={setSelectedSource}
-              placeholder="选择文档来源"
+              placeholder={t('queryAssistant.sourceSelect')}
             >
-              <Option value="all" style={{writingMode: 'horizontal-tb', textOrientation: 'mixed'}}>所有文档</Option>
+              <Option value="all" style={{writingMode: 'horizontal-tb', textOrientation: 'mixed'}}>{t('queryAssistant.allSources')}</Option>
               {sources.map(source => (
                 <Option key={source} value={source} style={{writingMode: 'horizontal-tb', textOrientation: 'mixed'}}>{source}</Option>
               ))}
             </Select>
             
-            <Text>文档上下文:</Text>
+            <Text>{t('queryAssistant.useContext')}:</Text>
             <Switch 
               checked={useContext} 
               onChange={setUseContext} 
-              checkedChildren="开启"
-              unCheckedChildren="关闭"
+              checkedChildren={t('common.on')}
+              unCheckedChildren={t('common.off')}
             />
             
-            <Text>强制使用文档:</Text>
+            <Text>{t('queryAssistant.forceUseDocuments')}:</Text>
             <Switch 
               checked={forceUseDocuments} 
               onChange={setForceUseDocuments} 
-              checkedChildren="开启"
-              unCheckedChildren="关闭"
+              checkedChildren={t('common.on')}
+              unCheckedChildren={t('common.off')}
               disabled={!useContext}
             />
             
             {useContext && (
               <>
-                <Text>最大引用文档数:</Text>
+                <Text>{t('queryAssistant.maxContextDocs')}:</Text>
                 <Select 
                   style={{ width: 80 }} 
                   value={maxContextDocs} 
@@ -370,7 +552,7 @@ const QueryAssistant = () => {
           ) : (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="开始与AI助手对话"
+              description={t('queryAssistant.startChat')}
               style={{ margin: '60px 0' }}
             />
           )}
@@ -389,7 +571,7 @@ const QueryAssistant = () => {
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="输入问题..."
+            placeholder={t('queryAssistant.inputPlaceholder')}
             autoSize={{ minRows: 2, maxRows: 6 }}
             style={{ 
               borderRadius: '8px 0 0 8px', 
@@ -415,10 +597,35 @@ const QueryAssistant = () => {
 
         {loading && (
           <div style={{ textAlign: 'center' }}>
-            <Spin tip="思考中..." />
+            <Spin tip={t('queryAssistant.thinking')} />
           </div>
         )}
       </Card>
+
+      {/* 导入对话的模态框 */}
+      <Modal
+        title={t('queryAssistant.importDialog.title')}
+        open={importModalVisible}
+        onCancel={() => setImportModalVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setImportModalVisible(false)}>
+            {t('common.cancel')}
+          </Button>,
+          <Button key="import" type="primary" onClick={handleImport}>
+            {t('queryAssistant.importDialog.selectFile')}
+          </Button>
+        ]}
+      >
+        <p>{t('queryAssistant.importDialog.description')}</p>
+        <p>{t('queryAssistant.importDialog.warning')}</p>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept=".json"
+          style={{ display: 'none' }}
+        />
+      </Modal>
     </div>
   );
 };

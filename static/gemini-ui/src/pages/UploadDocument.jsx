@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Upload, Card, Button, Form, Input, Switch, Slider, message, Space, Typography, Alert, Progress, Row, Col, Radio } from 'antd';
 import { UploadOutlined, FileTextOutlined, InboxOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 const { Dragger } = Upload;
 const { TextArea } = Input;
 const { Title, Paragraph, Text } = Typography;
 
 const UploadDocument = () => {
+  const { t } = useTranslation();
   const [form] = Form.useForm();
   const [uploadType, setUploadType] = useState('pdf');
   const [useIntelligentChunking, setUseIntelligentChunking] = useState(true);
@@ -18,7 +20,7 @@ const UploadDocument = () => {
 
   const handleUpload = async (values) => {
     if (uploadType === 'text' && !values.content) {
-      setErrorMessage('请输入文本内容');
+      setErrorMessage(t('uploadDocument.inputRequired'));
       return;
     }
 
@@ -33,15 +35,15 @@ const UploadDocument = () => {
         const response = await axios.post('/api/v1/documents', {
           content: values.content,
           metadata: {
-            source: values.source || '手动输入',
+            source: values.source || t('common.unknown'),
             type: 'text',
-            author: values.author || '未知'
+            author: values.author || t('common.unknown')
           }
         });
         
         setUploadResult({
           success: true,
-          message: '文本添加成功',
+          message: t('uploadDocument.uploadSuccess'),
           documentId: response.data.id
         });
         
@@ -49,10 +51,10 @@ const UploadDocument = () => {
       }
     } catch (error) {
       console.error('上传失败:', error);
-      setErrorMessage('上传失败，请稍后重试');
+      setErrorMessage(t('uploadDocument.uploadFailed'));
       setUploadResult({
         success: false,
-        message: '上传失败: ' + (error.response?.data?.detail || error.message)
+        message: t('uploadDocument.uploadFailed') + ': ' + (error.response?.data?.detail || error.message)
       });
     } finally {
       setUploading(false);
@@ -65,7 +67,7 @@ const UploadDocument = () => {
     multiple: false,
     action: `/api/v1/upload-pdf`,
     data: {
-      use_intelligent_chunking: useIntelligentChunking,
+      chunking_strategy: useIntelligentChunking ? 'intelligent' : 'fixed_size',
       chunk_size: form.getFieldValue('chunkSize') || 1000,
       overlap: form.getFieldValue('overlap') || 200,
     },
@@ -75,7 +77,7 @@ const UploadDocument = () => {
     beforeUpload: (file) => {
       const isPDF = file.type === 'application/pdf';
       if (!isPDF) {
-        message.error('只能上传PDF文件!');
+        message.error(t('uploadDocument.fileTypeError'));
       }
       return isPDF || Upload.LIST_IGNORE;
     },
@@ -89,24 +91,24 @@ const UploadDocument = () => {
       if (info.file.status === 'done') {
         setUploading(false);
         setUploadProgress(100);
-        message.success(`${info.file.name} 上传成功`);
+        message.success(`${info.file.name} ${t('uploadDocument.uploadSuccess')}`);
         setUploadResult({
           success: true,
-          message: '文件上传成功',
+          message: t('uploadDocument.uploadSuccess'),
           fileInfo: info.file.response
         });
       } else if (info.file.status === 'error') {
         setUploading(false);
         setUploadProgress(0);
-        message.error(`${info.file.name} 上传失败`);
-        setErrorMessage(`上传失败: ${info.file.response?.detail || '请检查文件格式或网络连接'}`);
+        message.error(`${info.file.name} ${t('uploadDocument.uploadFailed')}`);
+        setErrorMessage(`${t('uploadDocument.uploadFailed')}: ${info.file.response?.detail || t('uploadDocument.uploadFailed')}`);
       }
     },
   };
 
   return (
     <div>
-      <Card title="上传文档" bordered={false}>
+      <Card title={t('uploadDocument.title')} bordered={false}>
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           <Row gutter={16}>
             <Col span={24}>
@@ -115,8 +117,8 @@ const UploadDocument = () => {
                 onChange={(e) => setUploadType(e.target.value)}
                 style={{ marginBottom: 20 }}
               >
-                <Radio.Button value="pdf">上传PDF文件</Radio.Button>
-                <Radio.Button value="text">输入文本内容</Radio.Button>
+                <Radio.Button value="pdf">{t('uploadDocument.tabPdf')}</Radio.Button>
+                <Radio.Button value="text">{t('uploadDocument.tabText')}</Radio.Button>
               </Radio.Group>
             </Col>
           </Row>
@@ -125,14 +127,14 @@ const UploadDocument = () => {
             <>
               <Form form={form} layout="vertical">
                 <Form.Item
-                  label="智能分块设置"
+                  label={t('uploadDocument.intelligentChunking')}
                   name="useIntelligentChunking"
                   valuePropName="checked"
                   initialValue={true}
                 >
                   <Switch
-                    checkedChildren="智能分块"
-                    unCheckedChildren="固定分块"
+                    checkedChildren={t('uploadDocument.smartChunking')}
+                    unCheckedChildren={t('uploadDocument.fixedChunking')}
                     defaultChecked
                     onChange={(checked) => setUseIntelligentChunking(checked)}
                   />
@@ -141,7 +143,7 @@ const UploadDocument = () => {
                 {!useIntelligentChunking && (
                   <>
                     <Form.Item
-                      label="分块大小"
+                      label={t('uploadDocument.chunkSize')}
                       name="chunkSize"
                       initialValue={1000}
                     >
@@ -153,7 +155,7 @@ const UploadDocument = () => {
                       }} />
                     </Form.Item>
                     <Form.Item
-                      label="重叠大小"
+                      label={t('uploadDocument.overlapSize')}
                       name="overlap"
                       initialValue={200}
                     >
@@ -172,9 +174,9 @@ const UploadDocument = () => {
                     <p className="ant-upload-drag-icon">
                       <InboxOutlined />
                     </p>
-                    <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
+                    <p className="ant-upload-text">{t('uploadDocument.dragText')}</p>
                     <p className="ant-upload-hint">
-                      仅支持PDF文件，系统将自动处理并创建向量索引
+                      {t('uploadDocument.dropHint')}
                     </p>
                   </Dragger>
                 </Form.Item>
@@ -183,23 +185,23 @@ const UploadDocument = () => {
           ) : (
             <Form form={form} layout="vertical" onFinish={handleUpload}>
               <Form.Item
-                label="文本内容"
+                label={t('uploadDocument.textAreaLabel')}
                 name="content"
-                rules={[{ required: true, message: '请输入文本内容' }]}
+                rules={[{ required: true, message: t('uploadDocument.inputRequired') }]}
               >
-                <TextArea rows={6} placeholder="请输入要添加的文本内容..." />
+                <TextArea rows={6} placeholder={t('uploadDocument.textAreaPlaceholder')} />
               </Form.Item>
               <Form.Item
-                label={<span style={{display: 'inline-block', writingMode: 'horizontal-tb'}}>来源</span>}
+                label={<span style={{display: 'inline-block', writingMode: 'horizontal-tb'}}>{t('uploadDocument.sourceLabel')}</span>}
                 name="source"
               >
-                <Input placeholder="文档来源(可选)" style={{writingMode: 'horizontal-tb'}} />
+                <Input placeholder={t('uploadDocument.sourcePlaceholder')} style={{writingMode: 'horizontal-tb'}} />
               </Form.Item>
               <Form.Item
-                label="作者"
+                label={t('uploadDocument.authorLabel')}
                 name="author"
               >
-                <Input placeholder="作者(可选)" />
+                <Input placeholder={t('uploadDocument.authorPlaceholder')} />
               </Form.Item>
               <Form.Item>
                 <Button
@@ -208,7 +210,7 @@ const UploadDocument = () => {
                   loading={uploading}
                   onClick={() => form.submit()}
                 >
-                  添加文本
+                  {t('uploadDocument.addTextBtn')}
                 </Button>
               </Form.Item>
             </Form>
@@ -224,15 +226,15 @@ const UploadDocument = () => {
 
           {uploadResult && uploadResult.success && (
             <Alert
-              message="上传成功"
+              message={t('uploadDocument.uploadSuccess')}
               description={
                 <div>
                   <p>{uploadResult.message}</p>
-                  {uploadResult.documentId && <p>文档ID: {uploadResult.documentId}</p>}
+                  {uploadResult.documentId && <p>{t('uploadDocument.documentId')}: {uploadResult.documentId}</p>}
                   {uploadResult.fileInfo && (
                     <>
-                      <p>文件名: {uploadResult.fileInfo.filename}</p>
-                      <p>处理的文本块数: {uploadResult.fileInfo.chunks_processed}</p>
+                      <p>{t('uploadDocument.fileInfoTitle')}: {uploadResult.fileInfo.filename}</p>
+                      <p>{t('uploadDocument.chunksProcessed')}: {uploadResult.fileInfo.chunks_processed}</p>
                     </>
                   )}
                 </div>

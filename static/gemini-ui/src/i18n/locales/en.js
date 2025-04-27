@@ -17,6 +17,8 @@ export default {
     noData: 'No data available',
     back: 'Back',
     more: 'More',
+    on: 'On',
+    off: 'Off'
   },
   
   // Authentication
@@ -41,16 +43,16 @@ export default {
   // Navigation
   nav: {
     home: 'Home',
-    queryAssistant: 'AI Assistant',
-    uploadDocument: 'Upload Document',
     documentList: 'Document List',
-    documentSearch: 'Document Search',
+    uploadDocument: 'Upload Document',
+    queryAssistant: 'Query Assistant',
+    strategyEvaluation: 'Strategy Evaluation'
   },
   
   // Home page
   home: {
     title: 'Smart RAG Platform',
-    subtitle: 'Intelligent document retrieval and Q&A system based on Google Gemini 2.0 Flash model',
+    subtitle: 'Intelligent Document Retrieval and Q&A System based on Google Gemini 2.5 Pro',
     statsDocuments: 'Total Documents',
     statsChunks: 'Total Text Chunks',
     statsUpdated: 'Last Updated',
@@ -68,19 +70,20 @@ export default {
   // Document list page
   documentList: {
     title: 'Document List',
-    searchPlaceholder: 'Search document source...',
-    colId: 'ID',
-    colSource: 'Source',
-    colContent: 'Content Preview',
-    colType: 'Type',
-    colTime: 'Time',
-    colActions: 'Actions',
+    empty: 'No documents',
+    upload: 'Upload Document',
+    search: 'Search Documents',
+    source: 'Source',
+    createdAt: 'Created At',
+    actions: 'Actions',
+    delete: 'Delete',
     deleteConfirm: 'Are you sure you want to delete this document?',
     deleteSuccess: 'Document deleted successfully',
-    deleteFailed: 'Failed to delete document, please try again later',
-    fetchFailed: 'Failed to fetch document list, please try again later',
-    unknown: 'Unknown source',
-    noContent: 'No content',
+    deleteError: 'Failed to delete document',
+    chunkingStrategy: {
+      fixed_size: 'Fixed Chunking',
+      intelligent: 'Intelligent Chunking'
+    }
   },
   
   // Document search page
@@ -146,10 +149,20 @@ export default {
     moreContextDocs: '{count} more reference documents',
     startChat: 'Start chatting with AI Assistant',
     errorFetch: 'Failed to get answer, please try again later',
+    forceUseDocuments: 'Force Use Documents',
+    referenceDocument: 'Reference Documents',
+    documentFragment: 'Document Fragment',
+    additionalDocuments: '{count} more reference documents',
+    importDialog: {
+      title: 'Import Chat History',
+      selectFile: 'Select File',
+      description: 'Please select a previously exported chat history file (JSON format).',
+      warning: 'Note: Importing will replace the current chat history.'
+    }
   },
   
   // Footer
   footer: {
-    copyright: 'Smart RAG Platform ©{year} Powered by Google Gemini 2.0',
+    copyright: 'Smart RAG Platform ©{year} Powered by Google Gemini 2.5',
   }
 }; 

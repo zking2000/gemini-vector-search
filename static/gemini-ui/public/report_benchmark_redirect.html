@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>重定向到基准测试报告</title>
+    <script>
+        // 从当前URL中获取主机名和端口
+        const currentHost = window.location.hostname;
+        
+        // 基准测试报告URL
+        const backendPort = 8000; // 后端FastAPI服务运行的端口
+        const reportUrl = `http://${currentHost}:${backendPort}/report/benchmark.html`;
+        
+        // 重定向到后端服务器的报告页面
+        window.location.href = reportUrl;
+    </script>
+</head>
+<body>
+    <p>正在重定向到基准测试报告页面...</p>
+    <p>如果页面没有自动跳转，请<a id="reportLink" href="#">点击这里</a>。</p>
+    
+    <script>
+        // 设置链接的href属性
+        document.getElementById('reportLink').href = reportUrl;
+    </script>
+</body>
+</html> 

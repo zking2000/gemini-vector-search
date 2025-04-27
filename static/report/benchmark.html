@@ -1,0 +1,2136 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vector Search Benchmark Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f8fa;
+        }
+        h1, h2, h3 {
+            color: #0366d6;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        }
+        .query-card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            margin-bottom: 20px;
+            overflow: hidden;
+            transition: transform 0.2s;
+            position: relative;
+        }
+        .query-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .query-header {
+            padding: 15px 20px;
+            background-color: #f1f8ff;
+            border-bottom: 1px solid #e1e4e8;
+            position: relative;
+        }
+        .query-title {
+            font-weight: 600;
+            margin: 0;
+            color: #24292e;
+        }
+        .query-body {
+            padding: 20px;
+        }
+        .result-card {
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            padding: 15px;
+            background-color: #f6f8fa;
+        }
+        .result-card.fixed {
+            border-left: 4px solid #0366d6;
+        }
+        .result-card.intelligent {
+            border-left: 4px solid #28a745;
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        .result-meta {
+            font-size: 0.85em;
+            color: #586069;
+            margin-bottom: 10px;
+        }
+        .result-content {
+            background-color: #fff;
+            border: 1px solid #e1e4e8;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 0.9em;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        }
+        .highlights {
+            background-color: #fffbdd;
+            padding: 2px;
+            border-radius: 2px;
+        }
+        .summary {
+            margin-top: 30px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            padding: 20px;
+        }
+        .summary-header {
+            border-bottom: 1px solid #e1e4e8;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        .stat-card {
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            color: #586069;
+            text-align: center;
+        }
+        .better {
+            color: #28a745;
+        }
+        .worse {
+            color: #d73a49;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 0.75em;
+            font-weight: 600;
+            border-radius: 2em;
+            margin-left: 8px;
+        }
+        .badge.fixed {
+            background-color: #0366d680;
+            color: white;
+        }
+        .badge.intelligent {
+            background-color: #28a74580;
+            color: white;
+        }
+        .winner-label {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #ffdf1e;
+            color: #24292e;
+            padding: 3px 8px;
+            font-size: 0.7em;
+            border-radius: 2em;
+            font-weight: 600;
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .comparison-table th, .comparison-table td {
+            border: 1px solid #e1e4e8;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .comparison-table th {
+            background-color: #f6f8fa;
+            font-weight: 600;
+        }
+        .comparison-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            color: #586069;
+            font-size: 0.9em;
+        }
+        pre {
+            overflow-x: auto;
+            background-color: #f6f8fa;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #e1e4e8;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f6f8fa;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f6f8fa;
+        }
+        @media (max-width: 768px) {
+            .summary-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Vector Search Chunking Strategy Benchmark Report</h1>
+        <p>Generated time: 2025-04-26 14:16:05</p>
+        <p>Test queries count: 10</p>
+    </div>
+
+    <div class="summary">
+        <div class="summary-header">
+            <h2>Execution Results Summary</h2>
+        </div>
+        <div class="summary-stats">
+            <div class="stat-card">
+                <div class="stat-label">Total Queries</div>
+                <div class="stat-value">10</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Fixed Chunking Strategy Wins</div>
+                <div class="stat-value">1</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Intelligent Chunking Strategy Wins</div>
+                <div class="stat-value">9</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Fixed Chunking Average Similarity</div>
+                <div class="stat-value">0.7717</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Intelligent Chunking Average Similarity</div>
+                <div class="stat-value">0.7816</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Fixed Chunking Average Processing Time</div>
+                <div class="stat-value">176.29ms</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Intelligent Chunking Average Processing Time</div>
+                <div class="stat-value">99.43ms</div>
+            </div>
+        </div>
+
+        <div class="summary-header" style="margin-top: 30px;">
+            <h2>Strategy Comparison Table</h2>
+        </div>
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Fixed Chunking Strategy</th>
+                    <th>Intelligent Chunking Strategy</th>
+                    <th>Winning Strategy</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Wins Count</td>
+                    <td>1</td>
+                    <td>9</td>
+                    <td>Intelligent Chunking</td>
+                </tr>
+                <tr>
+                    <td>Average Similarity</td>
+                    <td>0.7717</td>
+                    <td>0.7816</td>
+                    <td>Intelligent Chunking</td>
+                </tr>
+                <tr>
+                    <td>Average Processing Time</td>
+                    <td>176.29ms</td>
+                    <td>99.43ms</td>
+                    <td>Intelligent Chunking</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2>Query Detailed Results</h2>
+    
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">What was the difference between the fund's return and the benchmark index?</h3>
+            
+            <span class="winner-label">Fixed Chunking Strategy Won</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>Evaluation Result:</strong> 固定分块策略找到相似度更高的文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>Fixed Chunking Strategy Results<span class="badge fixed">5 documents</span></span>
+                    <span>Similarity: 0.7868 | Processing Time: 232.4657440185547ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202340
+Results
+Investments
+Organisation
+Financial reporting
+allocation. A delegated mandate structure helps us build deep insight 
+into selected market segments and companies. This insight puts us in a 
+better</pre>
+                    <div><small>Document ID: 4131 | Similarity: 0.7921</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202338
+Results
+Investments
+Organisation
+Financial reporting
+We analysed how these scenarios might affect the fund’s value and 
+calculated potential losses over a period of up to five years. The equity 
+market i</pre>
+                    <div><small>Document ID: 4130 | Similarity: 0.7905</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202341
+Results
+Investments
+Organisation
+Financial reporting
+Equity management
+Equity management is measured against the equity portion of the 
+benchmark index, adjusted for sales of equities to fund investments</pre>
+                    <div><small>Document ID: 4132 | Similarity: 0.7894</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202310
+Results
+Investments
+Organisation
+Financial reporting
+equities and bonds sold to fund them. This meant that unlisted real estate 
+made a contribution of -0.58 percentage point to the fund’s relative retur</pre>
+                    <div><small>Document ID: 4111 | Similarity: 0.7811</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Norges Bank Årsrapport og regnskap 20226 
+1. Results→ 7 The Executive Board’s assessment
+ 12 CEO letter
+ 14 Key figures
+
+Government Pension Fund Global Annual report 20237
+From left to right, top to bottom: Mona Helen Sørensen, Egil Herman Sjursen, Kjerst</pre>
+                    <div><small>Document ID: 4108 | Similarity: 0.7810</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>Intelligent Chunking Strategy Results<span class="badge intelligent">5 documents</span></span>
+                    <span>Similarity: 0.7867 | Processing Time: 105.31115531921387ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>The fund’s investments in real estate and unlisted renewable energy 
+infrastructure are not part of the benchmark index from the Ministry. We 
+sell equities and bonds in the benchmark index to fund investments in 
+real estate and unlisted infrastructure.</pre>
+                    <div><small>Document ID: 4049 | Similarity: 0.8141</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Office properties account for around 
+half of the portfolio, and investments in office and retail premises are 
+concentrated in a small number of major cities. Higher real interest rates 
+since the pandemic have resulted in weak returns on real estate in</pre>
+                    <div><small>Document ID: 4037 | Similarity: 0.7912</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government bonds from Europe and emerging markets 
+made the most positive contributions, while investments in corporate 
+bonds made a negative contribution. Fixed-income management also had 
+a lower duration than the benchmark in a year when interest rate</pre>
+                    <div><small>Document ID: 4050 | Similarity: 0.7863</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Year Fund1Equity 	management2Fixed-income 		
+management2Real	estate	 	
+management2Infrastructure 		
+management
+2023 -0.18 0.38 0.51 -10.51 -5.67
+2022 0.87 0.52 1.68 0.22 25.09
+202130.75 0.78 -0.04 7.36 8.04
+2020 0.27 0.98 0.76 -13.81
+2019 0.23 0.51 0.11 -</pre>
+                    <div><small>Document ID: 4051 | Similarity: 0.7715</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 20231Government 
+Pension Fund 
+Global  
+Annual report 2023
+
+
+Norges Bank Årsrapport og regnskap 20222
+The Government Pension Fund Global 
+is owned by the Norwegian people, 
+represented by the Government and 
+th</pre>
+                    <div><small>Document ID: 4035 | Similarity: 0.7705</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>Similarity and Processing Time Comparison</strong>
+            </div>
+            
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Average Similarity</th>
+                        <th>Processing Time (ms)</th>
+                        <th>Winning Metric</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Fixed Chunking Strategy</td>
+                        <td>0.7868</td>
+                        <td>232.47</td>
+                        <td>Higher Similarity</td>
+                    </tr>
+                    <tr>
+                        <td>Intelligent Chunking Strategy</td>
+                        <td>0.7867</td>
+                        <td>105.31</td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">What was the percentage allocation across asset classes in 2023?</h3>
+            
+            <span class="winner-label">Intelligent Chunking Strategy Won</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>Evaluation Result:</strong> 智能分块策略找到相似度更高的文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>Fixed Chunking Strategy Results<span class="badge fixed">5 documents</span></span>
+                    <span>Similarity: 0.8097 | Processing Time: 166.52941703796387ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>Annual report 2023104
+Government Pension Fund GlobalConcentration risk
+Concentration analysis complements statistical risk estimation by describing the concentration of a single exposure or a 
+group of exposures. More concentrated portfolios tend to contr</pre>
+                    <div><small>Document ID: 4185 | Similarity: 0.8388</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Annual report 2023105
+Government Pension Fund GlobalAt the end of 2023, the equity portfolio’s share of the fund was 70.9 percent, up from 69.8 percent at year-end 2022. The 
+bond portfolio’s share of the fund was 27.1 percent, down from 27.5 percent at y</pre>
+                    <div><small>Document ID: 4186 | Similarity: 0.8122</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202347
+Results
+Investments
+Organisation
+Financial reporting
+Risk relative to the benchmark index
+The fund is invested differently to its benchmark index along various 
+dimensions, including asset classes, curre</pre>
+                    <div><small>Document ID: 4138 | Similarity: 0.8011</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202334
+Unlisted renewable 
+energy infrastructure
+Investments in unlisted renewable energy 
+infrastructure returned 3.7 percent and made up 0.1 
+percent of the fund at the end of the year.
+The return on investme</pre>
+                    <div><small>Document ID: 4127 | Similarity: 0.7984</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202348
+Results
+Investments
+Organisation
+Financial reporting
+Norges Bank’s Executive Board has also set a limit for expected shortfall for 
+the relative return between the fund and the benchmark index. The fund</pre>
+                    <div><small>Document ID: 4139 | Similarity: 0.7980</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>Intelligent Chunking Strategy Results<span class="badge intelligent">5 documents</span></span>
+                    <span>Similarity: 0.8122 | Processing Time: 130.11908531188965ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>Table	 9.2	 Allocation by asset class, country and currency 
+Asset	classMarket	value	in	percent	by	country	and	currency1Market	value	by	asset	
+class	in	percentMarket	value	by	asset	
+class	in	NOK	million
+31.12.2023 31.12.2022 Market 31.12.2023 Market 31.12</pre>
+                    <div><small>Document ID: 4086 | Similarity: 0.8372</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Return
+Unlisted	infrastructure	investments 3.68Renewable energy infrastructure
+
+Government Pension Fund Global Annual report 202335Global 
+investments
+Number of investment by asset class
+North America
+1,965  companies
+3,120  bonds from  
+735 issuers
+452 p</pre>
+                    <div><small>Document ID: 4047 | Similarity: 0.8099</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Year Fund1Equity 	management2Fixed-income 		
+management2Real	estate	 	
+management2Infrastructure 		
+management
+2023 -0.18 0.38 0.51 -10.51 -5.67
+2022 0.87 0.52 1.68 0.22 25.09
+202130.75 0.78 -0.04 7.36 8.04
+2020 0.27 0.98 0.76 -13.81
+2019 0.23 0.51 0.11 -</pre>
+                    <div><small>Document ID: 4051 | Similarity: 0.8055</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Our London office.Investment strategies
+
+Government Pension Fund Global Annual report 202346
+Results
+Investments
+Organisation
+Financial reporting
+In 2023, the fund was underweight in equities and overweight in bonds, and 
+overweight in emerging-market bon</pre>
+                    <div><small>Document ID: 4052 | Similarity: 0.8042</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Annual report 202394
+Government Pension Fund GlobalTable	 8.1	 Categorisation of the investment portfolio by level in the fair value hierarchy
+Level	1 Level	2 Level	3 Total
+Amounts	in	NOK	million 31.12.2023 31.12.2022 31.12.2023 31.12.2022 31.12.2023 31.1</pre>
+                    <div><small>Document ID: 4076 | Similarity: 0.8041</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>Similarity and Processing Time Comparison</strong>
+            </div>
+            
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Average Similarity</th>
+                        <th>Processing Time (ms)</th>
+                        <th>Winning Metric</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Fixed Chunking Strategy</td>
+                        <td>0.8097</td>
+                        <td>166.53</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Intelligent Chunking Strategy</td>
+                        <td>0.8122</td>
+                        <td>130.12</td>
+                        <td>Higher Similarity</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">How did the fund's renewable energy investments evolve?</h3>
+            
+            <span class="winner-label">Intelligent Chunking Strategy Won</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>Evaluation Result:</strong> 智能分块策略找到相似度更高的文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>Fixed Chunking Strategy Results<span class="badge fixed">5 documents</span></span>
+                    <span>Similarity: 0.7786 | Processing Time: 167.65356063842773ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202334
+Unlisted renewable 
+energy infrastructure
+Investments in unlisted renewable energy 
+infrastructure returned 3.7 percent and made up 0.1 
+percent of the fund at the end of the year.
+The return on investme</pre>
+                    <div><small>Document ID: 4127 | Similarity: 0.7959</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202310
+Results
+Investments
+Organisation
+Financial reporting
+equities and bonds sold to fund them. This meant that unlisted real estate 
+made a contribution of -0.58 percentage point to the fund’s relative retur</pre>
+                    <div><small>Document ID: 4111 | Similarity: 0.7762</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202341
+Results
+Investments
+Organisation
+Financial reporting
+Equity management
+Equity management is measured against the equity portion of the 
+benchmark index, adjusted for sales of equities to fund investments</pre>
+                    <div><small>Document ID: 4132 | Similarity: 0.7741</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Annual report 202390
+Government Pension Fund GlobalNote 7 Unlisted renewable energy 
+infrastructure 
+Accounting 	policy
+Investments in unlisted renewable energy infrastructure (Unlisted infrastructure) are made through subsidiaries of 
+Norges Bank, exclus</pre>
+                    <div><small>Document ID: 4170 | Similarity: 0.7738</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202319
+Results
+Investments
+Organisation
+Financial reporting
+CHART	5	 The fund’s market value in billions of kroner.
+Chart 5 The fund’s market value in billions of kroner.
+-2,00002,0004,0006,0008,00010,00012,000</pre>
+                    <div><small>Document ID: 4117 | Similarity: 0.7729</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>Intelligent Chunking Strategy Results<span class="badge intelligent">5 documents</span></span>
+                    <span>Similarity: 0.7870 | Processing Time: 95.39961814880371ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>The mandate from the Ministry of Finance requires responsible investment 
+to be an integral part of the management of the fund. A good long-term 
+return depends on sustainable economic, environmental and social 
+development. Norges Bank published expectat</pre>
+                    <div><small>Document ID: 4038 | Similarity: 0.7934</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Table 	7.2	 Changes in carrying amounts unlisted infrastructure
+Amounts	in	NOK	million 31.12.2023 31.12.2022
+Unlisted	infrastructure	at	1	January 		14	489 		14	287
+Net cash flow to/from investments 3 256 -1 143
+Unrealised gain/loss -1 010  735
+Foreign exc</pre>
+                    <div><small>Document ID: 4074 | Similarity: 0.7903</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>The fund is to aim for expected relative volatility of no more than 
+1.25 percentage points. The actual level at the end of the year was 0.34 
+percentage point, down from 0.39 percentage point at the end of 2022. The decrease was due mainly to a lower exp</pre>
+                    <div><small>Document ID: 4053 | Similarity: 0.7880</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Transactions between the GPFG and Norges Bank’s foreign exchange reserves
+Internal trades in the form of money market lending or borrowing between the GPFG and Norges Bank’s foreign exchange 
+reserves are presented as a net balance between the two portfol</pre>
+                    <div><small>Document ID: 4101 | Similarity: 0.7824</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>The fund also 
+had holdings above 10 percent in Vonovia and Great Portland Estates. The 
+single largest investment was in Vonovia at 38,759 million kroner. TABLE	14	 Ownership shares in percent for the ten largest listed real estate invest -
+ments as at 3</pre>
+                    <div><small>Document ID: 4046 | Similarity: 0.7811</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>Similarity and Processing Time Comparison</strong>
+            </div>
+            
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Average Similarity</th>
+                        <th>Processing Time (ms)</th>
+                        <th>Winning Metric</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Fixed Chunking Strategy</td>
+                        <td>0.7786</td>
+                        <td>167.65</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Intelligent Chunking Strategy</td>
+                        <td>0.7870</td>
+                        <td>95.40</td>
+                        <td>Higher Similarity</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">What strategic shifts were made in response to geopolitical tensions?</h3>
+            
+            <span class="winner-label">Intelligent Chunking Strategy Won</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>Evaluation Result:</strong> 智能分块策略找到相似度更高的文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>Fixed Chunking Strategy Results<span class="badge fixed">5 documents</span></span>
+                    <span>Similarity: 0.7327 | Processing Time: 170.14336585998535ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202337
+Results
+Investments
+Organisation
+Financial reportingInvestment risk
+Expected absolute volatility is a measure of how much the annual return 
+on the fund’s investments can normally be expected to fluctuat</pre>
+                    <div><small>Document ID: 4129 | Similarity: 0.7467</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202336
+Results
+Investments
+Organisation
+Financial reportingInvestment 
+risk
+With a large, global fund and a 70 percent allocation 
+to equities, we have to be prepared for considerable 
+fluctuations in the fund’</pre>
+                    <div><small>Document ID: 4128 | Similarity: 0.7424</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202354
+Results
+Investments
+Organisation
+Financial reporting
+We decided in autumn 2023 to close our representative office in Shanghai. 
+The Singapore office has been built up gradually to take care of all 
+opera</pre>
+                    <div><small>Document ID: 4141 | Similarity: 0.7262</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202319
+Results
+Investments
+Organisation
+Financial reporting
+CHART	5	 The fund’s market value in billions of kroner.
+Chart 5 The fund’s market value in billions of kroner.
+-2,00002,0004,0006,0008,00010,00012,000</pre>
+                    <div><small>Document ID: 4117 | Similarity: 0.7242</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202330
+Results
+Investments
+Organisation
+Financial reporting
+Unlisted real estate
+The fund’s investments in unlisted real estate had a market value of 301 
+billion kroner at the end of the year, equivalent to 1.</pre>
+                    <div><small>Document ID: 4124 | Similarity: 0.7238</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>Intelligent Chunking Strategy Results<span class="badge intelligent">5 documents</span></span>
+                    <span>Similarity: 0.7494 | Processing Time: 93.86014938354492ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>Debt	crisis	
+High real interest rates and high 
+public and private debt trigger 
+a deep and long recession in 
+both developed and emerging 
+markets. This could hit the 
+real estate sector particularly 
+hard. High levels of debt limit 
+governments’ ability</pre>
+                    <div><small>Document ID: 4048 | Similarity: 0.7746</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>For equities and bonds, direct transaction costs 
+normally consist of commission fees and transaction taxes, including stamp 
+duty. For unlisted real estate and unlisted renewable energy infrastructure, 
+they include one-off costs for the purchase and sal</pre>
+                    <div><small>Document ID: 4063 | Similarity: 0.7439</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>For unlisted real 
+estate, this involves measurement of the share of real estate under construction, vacancy, tenant concentration and 
+geographical concentration. For unlisted infrastructure, this involves measurement of exposure towards different sector</pre>
+                    <div><small>Document ID: 4085 | Similarity: 0.7433</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Equities
+Fair value of equities classified as Level 3 is sensitive to assumptions regarding whether trading will be resumed and how 
+markets have moved from the time the trading was suspended, as well as specific factors related to the country and the 
+in</pre>
+                    <div><small>Document ID: 4082 | Similarity: 0.7432</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>The fund is to aim for expected relative volatility of no more than 
+1.25 percentage points. The actual level at the end of the year was 0.34 
+percentage point, down from 0.39 percentage point at the end of 2022. The decrease was due mainly to a lower exp</pre>
+                    <div><small>Document ID: 4053 | Similarity: 0.7422</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>Similarity and Processing Time Comparison</strong>
+            </div>
+            
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Average Similarity</th>
+                        <th>Processing Time (ms)</th>
+                        <th>Winning Metric</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Fixed Chunking Strategy</td>
+                        <td>0.7327</td>
+                        <td>170.14</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Intelligent Chunking Strategy</td>
+                        <td>0.7494</td>
+                        <td>93.86</td>
+                        <td>Higher Similarity</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">How did fixed-income instruments contribute to the fund's return?</h3>
+            
+            <span class="winner-label">Intelligent Chunking Strategy Won</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>Evaluation Result:</strong> 智能分块策略找到相似度更高的文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>Fixed Chunking Strategy Results<span class="badge fixed">5 documents</span></span>
+                    <span>Similarity: 0.7973 | Processing Time: 185.0893497467041ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202342
+Results
+Investments
+Organisation
+Financial reporting
+Fixed-income management
+Fixed-income management is measured against the bond portion of the 
+benchmark index, adjusted for sales of bonds to fund inve</pre>
+                    <div><small>Document ID: 4133 | Similarity: 0.8106</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202341
+Results
+Investments
+Organisation
+Financial reporting
+Equity management
+Equity management is measured against the equity portion of the 
+benchmark index, adjusted for sales of equities to fund investments</pre>
+                    <div><small>Document ID: 4132 | Similarity: 0.8074</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202345
+Results
+Investments
+Organisation
+Financial reporting
+investment returns and reduce transaction costs for the fund. The strategy 
+aims to exploit relative valuations across instruments and issuers, the 
+p</pre>
+                    <div><small>Document ID: 4136 | Similarity: 0.7913</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202326
+Results
+Investments
+Organisation
+Financial reporting
+Strongest return on corporate bonds
+Government bonds returned 3.9 percent in 2023 and made up 60.7 percent 
+of the fund’s fixed-income investments at</pre>
+                    <div><small>Document ID: 4121 | Similarity: 0.7911</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202344
+Results
+Investments
+Organisation
+Financial reporting
+Investment strategies
+We employ a range of investment strategies in our management of the fund. 
+They are grouped into three main categories: market e</pre>
+                    <div><small>Document ID: 4135 | Similarity: 0.7859</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>Intelligent Chunking Strategy Results<span class="badge intelligent">5 documents</span></span>
+                    <span>Similarity: 0.8030 | Processing Time: 97.3520278930664ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>Government bonds from Europe and emerging markets 
+made the most positive contributions, while investments in corporate 
+bonds made a negative contribution. Fixed-income management also had 
+a lower duration than the benchmark in a year when interest rate</pre>
+                    <div><small>Document ID: 4050 | Similarity: 0.8225</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Year Fund1Equity 	management2Fixed-income 		
+management2Real	estate	 	
+management2Infrastructure 		
+management
+2023 -0.18 0.38 0.51 -10.51 -5.67
+2022 0.87 0.52 1.68 0.22 25.09
+202130.75 0.78 -0.04 7.36 8.04
+2020 0.27 0.98 0.76 -13.81
+2019 0.23 0.51 0.11 -</pre>
+                    <div><small>Document ID: 4051 | Similarity: 0.8101</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>TABLE	9	 Return on the fund's fixed-income investments in 2023. Measured in 
+ international currency and sorted by sector. In percent. Sector Return	Share	of	fixed-income	
+investments1
+Government bonds23.9 60.7
+Government-related bonds28.5 9.5
+Inflation-l</pre>
+                    <div><small>Document ID: 4044 | Similarity: 0.7981</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>The fund’s investments in real estate and unlisted renewable energy 
+infrastructure are not part of the benchmark index from the Ministry. We 
+sell equities and bonds in the benchmark index to fund investments in 
+real estate and unlisted infrastructure.</pre>
+                    <div><small>Document ID: 4049 | Similarity: 0.7927</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Office properties account for around 
+half of the portfolio, and investments in office and retail premises are 
+concentrated in a small number of major cities. Higher real interest rates 
+since the pandemic have resulted in weak returns on real estate in</pre>
+                    <div><small>Document ID: 4037 | Similarity: 0.7915</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>Similarity and Processing Time Comparison</strong>
+            </div>
+            
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Average Similarity</th>
+                        <th>Processing Time (ms)</th>
+                        <th>Winning Metric</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Fixed Chunking Strategy</td>
+                        <td>0.7973</td>
+                        <td>185.09</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Intelligent Chunking Strategy</td>
+                        <td>0.8030</td>
+                        <td>97.35</td>
+                        <td>Higher Similarity</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">What insights came out of the stress test scenarios in the report?</h3>
+            
+            <span class="winner-label">Intelligent Chunking Strategy Won</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>Evaluation Result:</strong> 智能分块策略找到相似度更高的文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>Fixed Chunking Strategy Results<span class="badge fixed">5 documents</span></span>
+                    <span>Similarity: 0.7537 | Processing Time: 164.4127368927002ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202337
+Results
+Investments
+Organisation
+Financial reportingInvestment risk
+Expected absolute volatility is a measure of how much the annual return 
+on the fund’s investments can normally be expected to fluctuat</pre>
+                    <div><small>Document ID: 4129 | Similarity: 0.7714</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202336
+Results
+Investments
+Organisation
+Financial reportingInvestment 
+risk
+With a large, global fund and a 70 percent allocation 
+to equities, we have to be prepared for considerable 
+fluctuations in the fund’</pre>
+                    <div><small>Document ID: 4128 | Similarity: 0.7644</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>131
+Annual report 2023 Government Pension Fund GlobalAuditor’s	responsibilities	for	the	audit	of	the	financial	statements
+Our objectives are to obtain reasonable assurance about whether the financial statements as a whole are free from 
+material misstatem</pre>
+                    <div><small>Document ID: 4211 | Similarity: 0.7460</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202338
+Results
+Investments
+Organisation
+Financial reporting
+We analysed how these scenarios might affect the fund’s value and 
+calculated potential losses over a period of up to five years. The equity 
+market i</pre>
+                    <div><small>Document ID: 4130 | Similarity: 0.7441</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Norges Bank Årsrapport og regnskap 20226 
+1. Results→ 7 The Executive Board’s assessment
+ 12 CEO letter
+ 14 Key figures
+
+Government Pension Fund Global Annual report 20237
+From left to right, top to bottom: Mona Helen Sørensen, Egil Herman Sjursen, Kjerst</pre>
+                    <div><small>Document ID: 4108 | Similarity: 0.7424</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>Intelligent Chunking Strategy Results<span class="badge intelligent">5 documents</span></span>
+                    <span>Similarity: 0.7622 | Processing Time: 97.94092178344727ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>Debt	crisis	
+High real interest rates and high 
+public and private debt trigger 
+a deep and long recession in 
+both developed and emerging 
+markets. This could hit the 
+real estate sector particularly 
+hard. High levels of debt limit 
+governments’ ability</pre>
+                    <div><small>Document ID: 4048 | Similarity: 0.7798</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Key IT processes are also 
+dependent on a well-functioning control environment at external service providers. IT systems that support financial 
+reporting are considered to be a key audit matter as the IT environment is important to ensure accuracy, compl</pre>
+                    <div><small>Document ID: 4105 | Similarity: 0.7606</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Set guidelines, job descriptions and delegate mandates
+The NBIM Leader Group Investment Meeting complements the delegation of responsibility by advising on investment risk 
+management and the portfolio’s investment universe. Internal risk reporting requir</pre>
+                    <div><small>Document ID: 4084 | Similarity: 0.7588</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>We also: 
+• Identify and assess the risks of material misstatement of the financial statements, whether due to fraud or error, design 
+and perform audit procedures responsive to those risks, and obtain audit evidence that is sufficient and appropriate to</pre>
+                    <div><small>Document ID: 4106 | Similarity: 0.7584</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Return
+Unlisted	infrastructure	investments 3.68Renewable energy infrastructure
+
+Government Pension Fund Global Annual report 202335Global 
+investments
+Number of investment by asset class
+North America
+1,965  companies
+3,120  bonds from  
+735 issuers
+452 p</pre>
+                    <div><small>Document ID: 4047 | Similarity: 0.7532</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>Similarity and Processing Time Comparison</strong>
+            </div>
+            
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Average Similarity</th>
+                        <th>Processing Time (ms)</th>
+                        <th>Winning Metric</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Fixed Chunking Strategy</td>
+                        <td>0.7537</td>
+                        <td>164.41</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Intelligent Chunking Strategy</td>
+                        <td>0.7622</td>
+                        <td>97.94</td>
+                        <td>Higher Similarity</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">How did unlisted real estate perform and why?</h3>
+            
+            <span class="winner-label">Intelligent Chunking Strategy Won</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>Evaluation Result:</strong> 智能分块策略找到相似度更高的文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>Fixed Chunking Strategy Results<span class="badge fixed">5 documents</span></span>
+                    <span>Similarity: 0.7519 | Processing Time: 177.07133293151855ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202330
+Results
+Investments
+Organisation
+Financial reporting
+Unlisted real estate
+The fund’s investments in unlisted real estate had a market value of 301 
+billion kroner at the end of the year, equivalent to 1.</pre>
+                    <div><small>Document ID: 4124 | Similarity: 0.7758</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202331
+Results
+Investments
+Organisation
+Financial reporting
+TABLE	12	 The fund's largest unlisted real estate investments as at 31 December 2023.
+Retail,	office	and	other	by	city1Percent
+Paris 21.8
+London 20.5</pre>
+                    <div><small>Document ID: 4125 | Similarity: 0.7492</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202342
+Results
+Investments
+Organisation
+Financial reporting
+Fixed-income management
+Fixed-income management is measured against the bond portion of the 
+benchmark index, adjusted for sales of bonds to fund inve</pre>
+                    <div><small>Document ID: 4133 | Similarity: 0.7489</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202343
+Results
+Investments
+Organisation
+Financial reporting
+return in 2023. Unlisted real estate investments made a contribution of 
+-0.58 percentage point. All markets had negative returns in 2023 other than</pre>
+                    <div><small>Document ID: 4134 | Similarity: 0.7431</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202310
+Results
+Investments
+Organisation
+Financial reporting
+equities and bonds sold to fund them. This meant that unlisted real estate 
+made a contribution of -0.58 percentage point to the fund’s relative retur</pre>
+                    <div><small>Document ID: 4111 | Similarity: 0.7424</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>Intelligent Chunking Strategy Results<span class="badge intelligent">5 documents</span></span>
+                    <span>Similarity: 0.7659 | Processing Time: 91.53509140014648ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>The fund’s unlisted real estate investments are almost entirely in office, 
+retail and logistics properties. Office properties account for around 
+half of the portfolio, and investments in office and retail premises are 
+concentrated in a small number of</pre>
+                    <div><small>Document ID: 4045 | Similarity: 0.7885</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Office properties account for around 
+half of the portfolio, and investments in office and retail premises are 
+concentrated in a small number of major cities. Higher real interest rates 
+since the pandemic have resulted in weak returns on real estate in</pre>
+                    <div><small>Document ID: 4037 | Similarity: 0.7753</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>For unlisted real 
+estate, this involves measurement of the share of real estate under construction, vacancy, tenant concentration and 
+geographical concentration. For unlisted infrastructure, this involves measurement of exposure towards different sector</pre>
+                    <div><small>Document ID: 4085 | Similarity: 0.7585</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>The fund’s investments in real estate and unlisted renewable energy 
+infrastructure are not part of the benchmark index from the Ministry. We 
+sell equities and bonds in the benchmark index to fund investments in 
+real estate and unlisted infrastructure.</pre>
+                    <div><small>Document ID: 4049 | Similarity: 0.7552</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>The fund is to aim for expected relative volatility of no more than 
+1.25 percentage points. The actual level at the end of the year was 0.34 
+percentage point, down from 0.39 percentage point at the end of 2022. The decrease was due mainly to a lower exp</pre>
+                    <div><small>Document ID: 4053 | Similarity: 0.7519</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>Similarity and Processing Time Comparison</strong>
+            </div>
+            
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Average Similarity</th>
+                        <th>Processing Time (ms)</th>
+                        <th>Winning Metric</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Fixed Chunking Strategy</td>
+                        <td>0.7519</td>
+                        <td>177.07</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Intelligent Chunking Strategy</td>
+                        <td>0.7659</td>
+                        <td>91.54</td>
+                        <td>Higher Similarity</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">Which companies contributed most to the fund's return in 2023?</h3>
+            
+            <span class="winner-label">Intelligent Chunking Strategy Won</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>Evaluation Result:</strong> 智能分块策略找到相似度更高的文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>Fixed Chunking Strategy Results<span class="badge fixed">5 documents</span></span>
+                    <span>Similarity: 0.7991 | Processing Time: 167.21582412719727ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202341
+Results
+Investments
+Organisation
+Financial reporting
+Equity management
+Equity management is measured against the equity portion of the 
+benchmark index, adjusted for sales of equities to fund investments</pre>
+                    <div><small>Document ID: 4132 | Similarity: 0.8045</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202310
+Results
+Investments
+Organisation
+Financial reporting
+equities and bonds sold to fund them. This meant that unlisted real estate 
+made a contribution of -0.58 percentage point to the fund’s relative retur</pre>
+                    <div><small>Document ID: 4111 | Similarity: 0.8006</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202319
+Results
+Investments
+Organisation
+Financial reporting
+CHART	5	 The fund’s market value in billions of kroner.
+Chart 5 The fund’s market value in billions of kroner.
+-2,00002,0004,0006,0008,00010,00012,000</pre>
+                    <div><small>Document ID: 4117 | Similarity: 0.8002</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202321
+Our New York office.
+Strong year for 
+equity investments
+The fund’s equity investments returned 21.3 percent 
+in 2023. Despite strong inflation, rising policy rates 
+and geopolitical turmoil, the stock m</pre>
+                    <div><small>Document ID: 4118 | Similarity: 0.7985</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Norges Bank Årsrapport og regnskap 20226 
+1. Results→ 7 The Executive Board’s assessment
+ 12 CEO letter
+ 14 Key figures
+
+Government Pension Fund Global Annual report 20237
+From left to right, top to bottom: Mona Helen Sørensen, Egil Herman Sjursen, Kjerst</pre>
+                    <div><small>Document ID: 4108 | Similarity: 0.7918</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>Intelligent Chunking Strategy Results<span class="badge intelligent">5 documents</span></span>
+                    <span>Similarity: 0.8032 | Processing Time: 95.24941444396973ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>The mandate from the Ministry of Finance requires responsible investment 
+to be an integral part of the management of the fund. A good long-term 
+return depends on sustainable economic, environmental and social 
+development. Norges Bank published expectat</pre>
+                    <div><small>Document ID: 4038 | Similarity: 0.8133</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Year Fund1Equity 	management2Fixed-income 		
+management2Real	estate	 	
+management2Infrastructure 		
+management
+2023 -0.18 0.38 0.51 -10.51 -5.67
+2022 0.87 0.52 1.68 0.22 25.09
+202130.75 0.78 -0.04 7.36 8.04
+2020 0.27 0.98 0.76 -13.81
+2019 0.23 0.51 0.11 -</pre>
+                    <div><small>Document ID: 4051 | Similarity: 0.8065</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Office properties account for around 
+half of the portfolio, and investments in office and retail premises are 
+concentrated in a small number of major cities. Higher real interest rates 
+since the pandemic have resulted in weak returns on real estate in</pre>
+                    <div><small>Document ID: 4037 | Similarity: 0.8040</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government bonds from Europe and emerging markets 
+made the most positive contributions, while investments in corporate 
+bonds made a negative contribution. Fixed-income management also had 
+a lower duration than the benchmark in a year when interest rate</pre>
+                    <div><small>Document ID: 4050 | Similarity: 0.7968</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Sales of 
+household goods such as food and drink fell. Consumers adjusted to higher 
+prices and shifted their spending towards activities such as travel and 
+dining out. Individual investments
+The fund was invested in 8,859 companies at the end of 2023, d</pre>
+                    <div><small>Document ID: 4042 | Similarity: 0.7952</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>Similarity and Processing Time Comparison</strong>
+            </div>
+            
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Average Similarity</th>
+                        <th>Processing Time (ms)</th>
+                        <th>Winning Metric</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Fixed Chunking Strategy</td>
+                        <td>0.7991</td>
+                        <td>167.22</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Intelligent Chunking Strategy</td>
+                        <td>0.8032</td>
+                        <td>95.25</td>
+                        <td>Higher Similarity</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">What long-term investment trends were highlighted?</h3>
+            
+            <span class="winner-label">Intelligent Chunking Strategy Won</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>Evaluation Result:</strong> 智能分块策略找到相似度更高的文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>Fixed Chunking Strategy Results<span class="badge fixed">5 documents</span></span>
+                    <span>Similarity: 0.7779 | Processing Time: 169.83389854431152ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>Norges Bank Årsrapport og regnskap 20226 
+1. Results→ 7 The Executive Board’s assessment
+ 12 CEO letter
+ 14 Key figures
+
+Government Pension Fund Global Annual report 20237
+From left to right, top to bottom: Mona Helen Sørensen, Egil Herman Sjursen, Kjerst</pre>
+                    <div><small>Document ID: 4108 | Similarity: 0.7815</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202310
+Results
+Investments
+Organisation
+Financial reporting
+equities and bonds sold to fund them. This meant that unlisted real estate 
+made a contribution of -0.58 percentage point to the fund’s relative retur</pre>
+                    <div><small>Document ID: 4111 | Similarity: 0.7802</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202319
+Results
+Investments
+Organisation
+Financial reporting
+CHART	5	 The fund’s market value in billions of kroner.
+Chart 5 The fund’s market value in billions of kroner.
+-2,00002,0004,0006,0008,00010,00012,000</pre>
+                    <div><small>Document ID: 4117 | Similarity: 0.7790</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202341
+Results
+Investments
+Organisation
+Financial reporting
+Equity management
+Equity management is measured against the equity portion of the 
+benchmark index, adjusted for sales of equities to fund investments</pre>
+                    <div><small>Document ID: 4132 | Similarity: 0.7758</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202337
+Results
+Investments
+Organisation
+Financial reportingInvestment risk
+Expected absolute volatility is a measure of how much the annual return 
+on the fund’s investments can normally be expected to fluctuat</pre>
+                    <div><small>Document ID: 4129 | Similarity: 0.7730</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>Intelligent Chunking Strategy Results<span class="badge intelligent">5 documents</span></span>
+                    <span>Similarity: 0.7913 | Processing Time: 95.07298469543457ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>The mandate from the Ministry of Finance requires responsible investment 
+to be an integral part of the management of the fund. A good long-term 
+return depends on sustainable economic, environmental and social 
+development. Norges Bank published expectat</pre>
+                    <div><small>Document ID: 4038 | Similarity: 0.8039</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Debt	crisis	
+High real interest rates and high 
+public and private debt trigger 
+a deep and long recession in 
+both developed and emerging 
+markets. This could hit the 
+real estate sector particularly 
+hard. High levels of debt limit 
+governments’ ability</pre>
+                    <div><small>Document ID: 4048 | Similarity: 0.7922</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>The fund’s unlisted real estate investments are almost entirely in office, 
+retail and logistics properties. Office properties account for around 
+half of the portfolio, and investments in office and retail premises are 
+concentrated in a small number of</pre>
+                    <div><small>Document ID: 4045 | Similarity: 0.7869</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>For unlisted real 
+estate, this involves measurement of the share of real estate under construction, vacancy, tenant concentration and 
+geographical concentration. For unlisted infrastructure, this involves measurement of exposure towards different sector</pre>
+                    <div><small>Document ID: 4085 | Similarity: 0.7868</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Office properties account for around 
+half of the portfolio, and investments in office and retail premises are 
+concentrated in a small number of major cities. Higher real interest rates 
+since the pandemic have resulted in weak returns on real estate in</pre>
+                    <div><small>Document ID: 4037 | Similarity: 0.7864</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>Similarity and Processing Time Comparison</strong>
+            </div>
+            
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Average Similarity</th>
+                        <th>Processing Time (ms)</th>
+                        <th>Winning Metric</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Fixed Chunking Strategy</td>
+                        <td>0.7779</td>
+                        <td>169.83</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Intelligent Chunking Strategy</td>
+                        <td>0.7913</td>
+                        <td>95.07</td>
+                        <td>Higher Similarity</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="query-card">
+        <div class="query-header">
+            <h3 class="query-title">Which companies were excluded based on responsible investment criteria?</h3>
+            
+            <span class="winner-label">Intelligent Chunking Strategy Won</span>
+            
+        </div>
+        <div class="query-body">
+            <div class="result-meta">
+                <strong>Evaluation Result:</strong> 智能分块策略找到相似度更高的文档
+            </div>
+            
+            <div class="result-card fixed">
+                <div class="result-header">
+                    <span>Fixed Chunking Strategy Results<span class="badge fixed">5 documents</span></span>
+                    <span>Similarity: 0.7298 | Processing Time: 162.46652603149414ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>Annual report 202392
+Government Pension Fund GlobalTable 7.4 specifies the GPFG’s share of net income generated in the underlying infrastructure companies, which is the basis 
+for Income/expense from unlisted infrastructure presented in table 7.1. 
+Table</pre>
+                    <div><small>Document ID: 4172 | Similarity: 0.7311</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202348
+Results
+Investments
+Organisation
+Financial reporting
+Norges Bank’s Executive Board has also set a limit for expected shortfall for 
+the relative return between the fund and the benchmark index. The fund</pre>
+                    <div><small>Document ID: 4139 | Similarity: 0.7304</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202340
+Results
+Investments
+Organisation
+Financial reporting
+allocation. A delegated mandate structure helps us build deep insight 
+into selected market segments and companies. This insight puts us in a 
+better</pre>
+                    <div><small>Document ID: 4131 | Similarity: 0.7299</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202311
+Results
+Investments
+Organisation
+Financial reporting
+management. In 2023, management costs amounted to 6.6 billion kroner, or 
+0.05 percent of assets under management. The Executive Board is satisfied 
+t</pre>
+                    <div><small>Document ID: 4112 | Similarity: 0.7289</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Government Pension Fund Global Annual report 202319
+Results
+Investments
+Organisation
+Financial reporting
+CHART	5	 The fund’s market value in billions of kroner.
+Chart 5 The fund’s market value in billions of kroner.
+-2,00002,0004,0006,0008,00010,00012,000</pre>
+                    <div><small>Document ID: 4117 | Similarity: 0.7285</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-card intelligent">
+                <div class="result-header">
+                    <span>Intelligent Chunking Strategy Results<span class="badge intelligent">5 documents</span></span>
+                    <span>Similarity: 0.7550 | Processing Time: 92.42844581604004ms</span>
+                </div>
+                
+                <div class="result-meta">
+                    <strong>Top 5 results:</strong>
+                </div>
+                
+                
+                <div class="result-content">
+                    <pre>The mandate from the Ministry of Finance requires responsible investment 
+to be an integral part of the management of the fund. A good long-term 
+return depends on sustainable economic, environmental and social 
+development. Norges Bank published expectat</pre>
+                    <div><small>Document ID: 4038 | Similarity: 0.7602</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>These 
+holdings are not traded in active markets. The valuation models take into account various observable market inputs such 
+as comparable equity quotes, last traded price and volume. Holdings in Level 3 consist of equities that are not listed or have</pre>
+                    <div><small>Document ID: 4080 | Similarity: 0.7556</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Transactions between the GPFG and Norges Bank’s foreign exchange reserves
+Internal trades in the form of money market lending or borrowing between the GPFG and Norges Bank’s foreign exchange 
+reserves are presented as a net balance between the two portfol</pre>
+                    <div><small>Document ID: 4101 | Similarity: 0.7544</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>Sales of 
+household goods such as food and drink fell. Consumers adjusted to higher 
+prices and shifted their spending towards activities such as travel and 
+dining out. Individual investments
+The fund was invested in 8,859 companies at the end of 2023, d</pre>
+                    <div><small>Document ID: 4042 | Similarity: 0.7538</small></div>
+                </div>
+                <hr>
+                
+                <div class="result-content">
+                    <pre>2  Unrealised gain/loss presented in table 7.1 includes net income in the underlying infrastructure companies which is not distributed back to the GPFG, and will 
+therefore not correspond to Unrealised gains/loss presented in table 7.4. Table 7.5 specifie</pre>
+                    <div><small>Document ID: 4075 | Similarity: 0.7511</small></div>
+                </div>
+                
+                
+                
+            </div>
+            
+            <div class="result-meta">
+                <strong>Similarity and Processing Time Comparison</strong>
+            </div>
+            
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Average Similarity</th>
+                        <th>Processing Time (ms)</th>
+                        <th>Winning Metric</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Fixed Chunking Strategy</td>
+                        <td>0.7298</td>
+                        <td>162.47</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Intelligent Chunking Strategy</td>
+                        <td>0.7550</td>
+                        <td>92.43</td>
+                        <td>Higher Similarity</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+
+    
+
+    <div class="footer">
+        <p>© 2025 Vector Search Benchmark Report | Generated on 2025-04-26 14:16:05</p>
+    </div>
+</body>
+</html>

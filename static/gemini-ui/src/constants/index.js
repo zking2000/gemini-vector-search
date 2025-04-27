@@ -28,7 +28,8 @@ export const ROUTES = {
   SEARCH: '/search',
   UPLOAD: '/upload',
   ASSISTANT: '/assistant',
-  LOGIN_CHECK: '/login-check'
+  LOGIN_CHECK: '/login-check',
+  STRATEGY_EVALUATION: '/strategy-evaluation'
 };
 
 // 默认值

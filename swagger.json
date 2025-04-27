@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Gemini Vector Search API",
-    "description": "Vector search system based on Google Gemini model, providing document management, vector retrieval and intelligent Q&A capabilities",
+    "description": "Vector search system based on Google Gemini 1.5 Flash model, providing document management, vector retrieval and intelligent Q&A capabilities",
     "version": "1.0.0",
     "contact": {
       "name": "API Support Team"
@@ -22,7 +22,8 @@
         "properties": {
           "text": {
             "type": "string",
-            "description": "Text that needs embedding vector generation"
+            "description": "Text content for generating embedding vector",
+            "example": "Vector search refers to finding documents in a high-dimensional vector space that are closest to the query vector based on similarity"
           }
         }
       },
@@ -35,7 +36,7 @@
               "type": "number",
               "format": "float"
             },
-            "description": "Generated embedding vector"
+            "description": "Generated embedding vector, typically an array of floating-point numbers"
           },
           "dimensions": {
             "type": "integer",
@@ -49,33 +50,25 @@
         "properties": {
           "prompt": {
             "type": "string",
-            "description": "Prompt text"
+            "description": "Text prompt to be completed",
+            "example": "Please explain what a vector database is and its main advantages"
           },
           "use_context": {
             "type": "boolean",
-            "description": "Whether to use context"
+            "description": "Whether to use context documents to assist generation",
+            "default": false
           },
           "context_query": {
             "type": "string",
-            "description": "Context query"
+            "description": "Query text for retrieving context, only effective when use_context is true",
+            "example": "vector database advantages features"
           },
           "max_context_docs": {
             "type": "integer",
-            "description": "Maximum number of context documents"
-          },
-          "context": {
-            "type": "string",
-            "description": "Manually provided context"
-          },
-          "temperature": {
-            "type": "number",
-            "format": "float",
-            "description": "Temperature parameter, controls output randomness"
-          },
-          "use_chunks": {
-            "type": "boolean",
-            "description": "Whether to use document chunks for search",
-            "default": true
+            "description": "Maximum number of context documents, recommended between 1-10",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 20
           },
           "disable_cache": {
             "type": "boolean",
@@ -84,7 +77,7 @@
           },
           "model_complexity": {
             "type": "string",
-            "description": "Preferred model complexity level: 'simple', 'normal', or 'complex'. Affects which Gemini model is used and thinking budget.",
+            "description": "Preferred model complexity level: 'simple', 'normal', or 'complex'. Defaults to auto-detection.",
             "enum": ["simple", "normal", "complex"]
           }
         }
@@ -104,23 +97,17 @@
       },
       "DocumentCreate": {
         "type": "object",
-        "required": ["title", "content"],
+        "required": ["content"],
         "properties": {
-          "title": {
-            "type": "string",
-            "description": "Document title"
-          },
           "content": {
             "type": "string",
-            "description": "Document content"
-          },
-          "source": {
-            "type": "string",
-            "description": "Document source"
+            "description": "Text content of the document, which will be converted to an embedding vector",
+            "example": "Vector databases are database systems specifically designed for storing and retrieving vectors. They allow users to find semantically similar content through similarity search."
           },
           "metadata": {
             "type": "object",
-            "description": "Document metadata"
+            "description": "Document metadata, can contain arbitrary key-value pairs",
+            "example": {"source": "technical_document.pdf", "author": "John Smith", "date": "2024-05-01"}
           }
         }
       },
@@ -155,6 +142,11 @@
             "type": "string",
             "format": "date-time",
             "description": "Creation time"
+          },
+          "chunking_strategy": {
+            "type": "string",
+            "description": "The chunking strategy used for this document",
+            "enum": ["fixed_size", "intelligent"]
           }
         }
       },
@@ -180,20 +172,15 @@
         "properties": {
           "query": {
             "type": "string",
-            "description": "Query text"
+            "description": "Search query text, for which an embedding vector will be generated",
+            "example": "How does vector search work?"
           },
           "limit": {
             "type": "integer",
-            "description": "Maximum number of documents to return"
-          },
-          "source_filter": {
-            "type": "string",
-            "description": "Filter documents by source"
-          },
-          "use_chunks": {
-            "type": "boolean",
-            "description": "Whether to use document chunks for search",
-            "default": true
+            "description": "Maximum number of results to return, default is 5, recommended between 1-20",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 20
           }
         }
       },
@@ -207,36 +194,32 @@
               "properties": {
                 "id": {
                   "type": "string",
-                  "description": "Chunk ID"
-                },
-                "document_id": {
-                  "type": "string",
                   "description": "Document ID"
-                },
-                "title": {
-                  "type": "string",
-                  "description": "Document title"
                 },
                 "content": {
                   "type": "string",
-                  "description": "Chunk content"
+                  "description": "Document content"
                 },
-                "source": {
-                  "type": "string",
-                  "description": "Document source"
+                "metadata": {
+                  "type": "object",
+                  "description": "Document metadata"
                 },
                 "similarity": {
                   "type": "number",
                   "format": "float",
-                  "description": "Similarity score"
-                },
-                "metadata": {
-                  "type": "object",
-                  "description": "Metadata"
+                  "description": "Similarity score between document and query"
                 }
               }
             },
-            "description": "Query results"
+            "description": "List of query results, each containing document content, metadata, and similarity score"
+          },
+          "context": {
+            "type": "string",
+            "description": "Context text prepared for LLM, merged from result contents"
+          },
+          "summary": {
+            "type": "string",
+            "description": "Summary analysis of query results"
           }
         }
       },
@@ -382,6 +365,141 @@
             "type": "string",
             "format": "date-time",
             "description": "Operation time"
+          }
+        }
+      },
+      "StrategyComparisonResponse": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The original query text"
+          },
+          "comparison": {
+            "type": "object",
+            "properties": {
+              "fixed_size_results": {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "description": "Number of results returned using fixed size strategy"
+                  },
+                  "documents": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Document"
+                    },
+                    "description": "Documents found using fixed size strategy"
+                  },
+                  "avg_similarity": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "Average similarity score for fixed size results"
+                  },
+                  "max_similarity": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "Maximum similarity score for fixed size results"
+                  }
+                }
+              },
+              "intelligent_results": {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "description": "Number of results returned using intelligent strategy"
+                  },
+                  "documents": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Document"
+                    },
+                    "description": "Documents found using intelligent strategy"
+                  },
+                  "avg_similarity": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "Average similarity score for intelligent results"
+                  },
+                  "max_similarity": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "Maximum similarity score for intelligent results"
+                  }
+                }
+              },
+              "evaluation": {
+                "type": "string",
+                "description": "Evaluation of which strategy performed better"
+              }
+            }
+          },
+          "recommended_strategy": {
+            "type": "string",
+            "description": "The recommended strategy based on comparison results"
+          }
+        }
+      },
+      "DualChunkingResponse": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Name of the processed file"
+          },
+          "file_size": {
+            "type": "integer",
+            "description": "Size of the file in bytes"
+          },
+          "text_length": {
+            "type": "integer",
+            "description": "Total length of extracted text"
+          },
+          "fixed_size_chunks": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "description": "Number of chunks created using fixed size strategy"
+              },
+              "chunk_size": {
+                "type": "integer",
+                "description": "Size of each chunk in characters"
+              },
+              "overlap": {
+                "type": "integer",
+                "description": "Overlap size between chunks"
+              },
+              "doc_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "description": "IDs of documents created with fixed size chunking"
+              }
+            }
+          },
+          "intelligent_chunks": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "description": "Number of chunks created using intelligent strategy"
+              },
+              "doc_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "description": "IDs of documents created with intelligent chunking"
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "description": "Processing status"
           }
         }
       }
@@ -1028,6 +1146,179 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/upload-dual-chunking": {
+      "post": {
+        "summary": "上传使用双重分块策略的文档",
+        "description": "上传PDF文档并同时使用固定尺寸分块和智能分块进行处理，方便后续比较不同策略的检索效果。注意：此端点仅支持PDF文件格式。",
+        "operationId": "uploadDualChunking",
+        "tags": ["Document Management"],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "PDF文件（仅支持.pdf格式）"
+                  }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "fixed_chunk_size",
+            "in": "query",
+            "description": "固定尺寸分块的块大小",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1000
+            }
+          },
+          {
+            "name": "fixed_overlap",
+            "in": "query",
+            "description": "固定尺寸分块的重叠大小",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "文档处理成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DualChunkingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数无效或文件类型不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compare-strategies": {
+      "post": {
+        "summary": "比较不同分块策略的检索效果",
+        "description": "对同一个查询使用不同的分块策略进行检索，并对比结果",
+        "operationId": "compareSearchStrategies",
+        "tags": ["Document Retrieval"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "parameters": [
+          {
+            "name": "source_filter",
+            "in": "query",
+            "description": "按文档来源筛选结果",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "document1.pdf"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "每种策略返回的最大结果数",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "default": 5
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "策略比较结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyComparisonResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Path, Form, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Path as PathParam, Form, BackgroundTasks, Request, Header
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional, Union
 import tempfile
@@ -13,6 +14,11 @@ import json
 from sqlalchemy import inspect
 from sqlalchemy.exc import SQLAlchemyError
 import traceback
+import subprocess
+import sys
+from pathlib import Path
+import re
+import uuid
 
 from app.db.database import get_db, engine
 from app.models.api_models import (
@@ -23,6 +29,7 @@ from app.models.api_models import (
 )
 from app.services.gemini_service import GeminiService
 from app.services.vector_service import VectorService
+from app.services.db_service import DatabaseService
 
 # Create a unified router, no longer need separate authenticated and non-authenticated routes
 router = APIRouter(prefix="/api/v1")
@@ -30,7 +37,14 @@ health_router = APIRouter(prefix="/api/v1")
 
 # Create service instances
 gemini_service = GeminiService()
-vector_service = VectorService()
+
+# 创建DatabaseService的临时实例，用于初始化VectorService
+def get_vector_service(db: Session = Depends(get_db)):
+    db_service = DatabaseService(db)
+    return VectorService(db_service, gemini_service)
+
+# 使用全局变量保存VectorService实例，在路由中使用依赖注入
+vector_service = None
 
 # Health check endpoint - no authentication required
 @health_router.get("/health", 
@@ -114,6 +128,7 @@ async def create_embedding(
 async def create_completion(
     request: CompletionRequest,
     db: Session = Depends(get_db),
+    vector_service: VectorService = Depends(get_vector_service),
 ):
     """
     Generate text completion
@@ -123,6 +138,7 @@ async def create_completion(
     Parameters:
         request: Request object containing prompt text and context configuration
         db: Database session
+        vector_service: Vector service instance
         
     Returns:
         CompletionResponse: Response object containing the generated completion text
@@ -176,6 +192,7 @@ async def create_completion(
 async def add_document(
     request: DocumentCreate,
     db: Session = Depends(get_db),
+    vector_service: VectorService = Depends(get_vector_service),
 ):
     """
     Add document to the vector database
@@ -185,6 +202,7 @@ async def add_document(
     Parameters:
         request: Request object containing document content and metadata
         db: Database session
+        vector_service: Vector service instance
         
     Returns:
         DocumentResponse: Response object containing information about the newly added document
@@ -225,6 +243,7 @@ async def query_documents(
     request: QueryRequest,
     source_filter: Optional[str] = Query(None, description="Filter results by document source", example="document1.pdf"),
     db: Session = Depends(get_db),
+    vector_service: VectorService = Depends(get_vector_service),
 ):
     """
     Query similar documents in the vector database
@@ -235,6 +254,7 @@ async def query_documents(
         request: Request object containing query text and configuration
         source_filter: Optional document source filter condition
         db: Database session
+        vector_service: Vector service instance
         
     Returns:
         QueryResponse: Response object containing similar documents, context, and summary
@@ -259,6 +279,7 @@ async def integration_query(
     debug: bool = Query(False, description="Return detailed debugging information"),
     force_use_documents: bool = Query(False, description="Force use document content answer even if no high similarity match found"),
     db: Session = Depends(get_db),
+    vector_service: VectorService = Depends(get_vector_service),
 ):
     """
     Integrated API: Vector query and result addition to prompt
@@ -271,6 +292,7 @@ async def integration_query(
         debug: Whether to return detailed debugging information
         force_use_documents: Force use document content answer even if no high similarity match found
         db: Database session
+        vector_service: Vector service instance
         
     Returns:
         CompletionResponse: Response object containing the generated answer, if debug enabled then includes debugging information
@@ -286,6 +308,35 @@ async def integration_query(
         is_chinese_query = any('\u4e00' <= c <= '\u9fff' for c in request.prompt)
         print(f"Is Chinese query: {is_chinese_query}")
         
+        # 检测是否是表格相关查询
+        is_table_query = any(term in request.prompt.lower() for term in [
+            "table", "row", "column", "ranking", "largest", "smallest", "third", "3rd", "top", 
+            "first", "second", "fourth", "fifth", "next", "previous", "highest", "lowest", 
+            "percentage", "比例", "表格", "行", "列", "排名", "最大", "最小", "第三", "前",
+            "country", "bond", "bonds", "holding", "investment", "government"
+        ])
+        
+        # 检测更多数字排名相关术语
+        has_ranking_terms = any(term in request.prompt.lower() for term in [
+            "largest", "biggest", "highest", "top", "smallest", "lowest", "bottom",
+            "first", "second", "third", "fourth", "fifth", "1st", "2nd", "3rd", "4th", "5th",
+            "排名第", "最高的", "最低的", "第一", "第二", "第三", "第四", "第五"
+        ])
+        
+        # 如果问题中包含排名相关术语，强制使用文档内容回答
+        if has_ranking_terms:
+            force_use_documents = True
+            print(f"检测到排名相关查询，强制使用文档内容回答")
+            
+        print(f"Is table-related query: {is_table_query}")
+        print(f"Force use documents: {force_use_documents}")
+        
+        # 增加表格相关的搜索 limit
+        max_context_docs = request.max_context_docs
+        if is_table_query:
+            max_context_docs = max(max_context_docs, 20)  # 表格查询增加文档返回数量
+            print(f"Increased max_context_docs to {max_context_docs} for table-related query")
+        
         # First query related documents
         search_query = request.context_query or request.prompt
         
@@ -298,16 +349,24 @@ async def integration_query(
         elif is_chinese_query:
             # Add some common Chinese philosophy and religious terms for other Chinese queries
             expanded_terms = ["中国", "哲学", "历史", "传统", "文化", "典籍", "经典"]  # China, philosophy, history, tradition, culture, ancient books, classics
+        elif is_table_query:
+            # 添加表格和财务相关的扩展术语
+            if "bond" in search_query.lower() or "investment" in search_query.lower():
+                expanded_terms = ["bond", "bonds", "holdings", "government", "sovereign", "treasury", "debt", 
+                                  "portfolio", "investment", "securities", "fixed income", "yield", "maturity",
+                                  "country", "countries", "allocation", "percentage", "asset", "table", "data"]
+            else:
+                expanded_terms = ["table", "data", "chart", "figure", "statistics", "number", "percentage", "ranking"]
         
         if expanded_terms:
             search_query = f"{search_query} {' '.join(expanded_terms)}"
             print(f"Expanded search query: {search_query}")
         
         # Increase return document count to improve probability of finding related content
-        max_context_docs = request.max_context_docs
         if is_chinese_query:
             max_context_docs = max(max_context_docs, 10)  # Chinese query at least returns 10 documents
         
+        # 对表格相关查询，特别是排名类查询，增加相似度阈值，以确保得到最相关的文档
         similar_docs = await vector_service.search_similar(
             db, 
             search_query, 
@@ -316,6 +375,15 @@ async def integration_query(
         )
         
         print(f"Found {len(similar_docs)} related documents")
+        
+        # 增加对文档相似度的更详细分析
+        docs_with_high_similarity = [doc for doc in similar_docs if doc.get("similarity", 0) > 0.7]
+        print(f"Found {len(docs_with_high_similarity)} documents with high similarity (>0.7)")
+        
+        # 针对表格查询，如果相似度不够高，强制使用文档内容
+        if is_table_query and has_ranking_terms and not docs_with_high_similarity:
+            force_use_documents = True
+            print("针对表格排名查询，没有找到高相似度文档，强制使用文档内容")
         
         # For debugging purposes, print content snippets of the first few documents
         if similar_docs:
@@ -339,6 +407,29 @@ async def integration_query(
         # Generate completion
         completion_prompt = request.prompt
         if context:
+            # 添加表格处理特殊指令
+            table_instruction = ""
+            if is_table_query:
+                table_instruction = """
+IMPORTANT: The reference material may contain table data and structured information. When answering:
+1. Pay special attention to any tables, data series, or numerical lists in the reference material
+2. Maintain the structural relationships between entities in tables (rows, columns, rankings)
+3. Verify numerical relationships carefully (largest, third-largest, percentages, etc.)
+4. If you identify a table, first reconstruct it mentally to understand the data structure
+5. Be precise when citing specific values, positions, or rankings from tabular data
+"""
+                
+                # 对于涉及排名的问题，添加更强的指导
+                if has_ranking_terms:
+                    table_instruction += """
+6. This question involves ranking or ordering. BE EXTREMELY CAREFUL to:
+   - Identify the exact ranking criteria (largest by what measure?)
+   - Count positions accurately when identifying rankings (1st, 2nd, 3rd, etc.)
+   - Double-check your answer by reviewing the data in the reference material
+   - Cite the specific table or data source that supports your answer
+   - For third-largest, ensure you are identifying the item in the THIRD position, not any other position
+"""
+            
             if is_chinese_query:
                 completion_prompt = f"""
 You are a knowledgeable assistant tasked with answering questions based ONLY on the provided reference material.
@@ -351,6 +442,7 @@ IMPORTANT INSTRUCTIONS:
 5. If the reference material does not contain the answer, clearly state this in Chinese.
 6. Translate relevant information from the English documents into Chinese to answer the query.
 7. When referencing specific points from the documents, mention which document they came from.
+{table_instruction}
 
 Reference material:
 {context}
@@ -361,13 +453,21 @@ Provide a comprehensive answer in Chinese, based strictly on the information in 
 """
             else:
                 completion_prompt = f"""
-You are a knowledgeable assistant, especially skilled at answering questions using ONLY the information in the provided reference material.
-Please answer the user's question based on the following reference material. If the reference material does not contain relevant information, please clearly indicate which information is missing.
+You are a knowledgeable assistant tasked with answering questions based ONLY on the provided reference material.
+
+IMPORTANT INSTRUCTIONS:
+1. You must ONLY use information found in the reference material.
+2. Do NOT use your general knowledge unless absolutely necessary to explain concepts in the documents.
+3. If the reference material does not contain the answer, clearly state this.
+4. When referencing specific points from the documents, mention which document they came from.
+{table_instruction}
 
 Reference material:
 {context}
 
 User question: {request.prompt}
+
+Provide a comprehensive answer based strictly on the information in the reference material.
 """
         else:
             # If no related documents found but user forces use of document content
@@ -421,28 +521,31 @@ User question: {request.prompt}
 """
                         else:
                             completion_prompt = f"""
-I am a knowledgeable assistant, especially skilled at answering questions about history and culture.
+I am a knowledgeable assistant, especially skilled at answering questions about documents in your system.
 
-I searched through all documents in the database ({doc_count} total) but couldn't find any directly relevant to "{request.prompt}".
+I searched through all documents in the database ({doc_count} total) but couldn't find any directly relevant to your question about "{request.prompt}".
+
 Here are some sample documents in the system:
 {doc_list}
 
-Since you've selected the force_use_documents mode, I must base my answer on documents in the system. However, the system may not contain information related to this question.
+Since this query is using the force_use_documents mode, I must base my answer only on documents in the system. However, the system doesn't appear to contain information related to your specific question.
 
-Please compare your question with the documents in the system and consider:
-1. Whether you need to upload documents containing the relevant information
-2. Whether you need to adjust your query wording to better match existing documents
-3. Whether you need to expand the document library to cover this topic
+Please consider:
+1. Uploading documents containing the relevant information about {request.prompt}
+2. Adjusting your query wording to better match existing documents
+3. Expanding the document library to cover this topic
 
-User question: {request.prompt}
-
-Please clearly indicate that the system may be missing relevant documents.
+I cannot provide a specific answer to your question as the necessary information doesn't appear to be in the document database.
 """
                 except Exception as e:
                     print(f"Failed to get document statistics: {e}")
                     # Use default prompt
+                    if is_chinese_query:
+                        completion_prompt = "非常抱歉，我在文档库中找不到与您问题相关的信息。请上传包含相关数据的文档，以便我能提供准确的回答。"
+                    else:
+                        completion_prompt = "I'm sorry, I cannot find information related to your question in the document database. Please upload relevant documents to get an accurate answer."
             
-            if not force_use_documents:
+            elif not force_use_documents:
                 if is_chinese_query:
                     completion_prompt = f"""
 非常抱歉，我在系统中没有找到与"{request.prompt}"相关的参考资料。
@@ -458,10 +561,13 @@ Please clearly indicate that the system may be missing relevant documents.
 """
                 else:
                     completion_prompt = f"""
-You are a knowledgeable assistant, especially skilled at answering questions about history and culture.
-I couldn't find any reference material related to "{request.prompt}". Please answer based on your knowledge, but please clearly indicate that your answer is not based on system document content.
+You are a knowledgeable assistant, especially skilled at answering questions about specific data in documents.
 
-User question: {request.prompt}
+I couldn't find any reference material in the document database related to "{request.prompt}". Since this appears to be a question about specific data (possibly involving rankings, tables or numeric information), I can only provide accurate answers based on actual document content.
+
+Please consider uploading relevant documents containing the information about {request.prompt}, especially if it involves specific data points, rankings, or table information that requires precise factual knowledge.
+
+Without access to the relevant documents, I cannot provide a specific answer to your question.
 """
         
         print(f"Generated completion prompt, length: {len(completion_prompt)}")
@@ -474,8 +580,12 @@ User question: {request.prompt}
                 "debug_info": {
                     "original_query": request.prompt,
                     "is_chinese_query": is_chinese_query,
+                    "is_table_query": is_table_query,
+                    "has_ranking_terms": has_ranking_terms,
+                    "force_use_documents": force_use_documents,
                     "search_query": search_query,
                     "docs_found": len(similar_docs),
+                    "high_similarity_docs": len(docs_with_high_similarity) if 'docs_with_high_similarity' in locals() else 0,
                     "context_length": len(context) if context else 0,
                     "document_snippets": [
                         {
@@ -508,7 +618,7 @@ User question: {request.prompt}
            response_description="Returns document list")
 async def get_documents(
     db: Session = Depends(get_db),
-    limit: int = Query(20, ge=1, le=100, description="Maximum number of documents to return"),
+    limit: int = Query(20, ge=1, le=1000, description="Maximum number of documents to return"),
     offset: int = Query(0, ge=0, description="Page offset for paging query"),
     source: Optional[str] = Query(None, description="Filter by document source, for example specific PDF file name")
 ):
@@ -519,7 +629,7 @@ async def get_documents(
     
     Parameters:
         db: Database session
-        limit: Maximum number of documents to return, range 1-100
+        limit: Maximum number of documents to return, range 1-1000
         offset: Page offset for paging query
         source: Filter by document source, for example specific PDF file name
         
@@ -531,7 +641,7 @@ async def get_documents(
     """
     try:
         # Build query conditions
-        query = "SELECT id, title, doc_metadata, created_at FROM documents"
+        query = "SELECT id, title, doc_metadata, created_at, chunking_strategy FROM documents"
         count_query = "SELECT COUNT(*) FROM documents"
         params = {}
         
@@ -574,6 +684,11 @@ async def get_documents(
                 # Delete embedding vector to reduce response size
                 if "_embedding" in metadata:
                     del metadata["_embedding"]
+                
+                # 获取真实的分块策略
+                chunking_strategy = row.chunking_strategy or metadata.get("strategy", "fixed_size")
+                metadata["chunking_strategy"] = chunking_strategy
+                
             except Exception as e:
                 print(f"Failed to handle document id={row.id} metadata: {e}")
                 metadata = {}
@@ -594,231 +709,409 @@ async def get_documents(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get document list: {str(e)}")
 
-@router.post("/upload-pdf", 
+@router.post("/upload_pdf", 
             response_model=Dict[str, Any], 
-            summary="Upload PDF File", 
-            description="Upload PDF file, parse content and store to vector database, supports intelligent chunking",
-            response_description="Returns processing result, including file name, processed chunk count, and document ID list")
+            summary="上传和处理PDF文件", 
+            description="上传PDF文件，解析内容并存储到向量数据库，支持智能分块",
+            response_description="返回处理结果，包括文件名、处理的区块数量和文档ID列表")
 async def upload_pdf(
     file: UploadFile = File(...),
-    use_intelligent_chunking: bool = Query(True, description="Whether to use Gemini for intelligent chunking"),
-    chunk_size: int = Query(1000, description="If not using intelligent chunking, fixed chunk size"),
-    overlap: int = Query(200, description="If not using intelligent chunking, fixed overlap size"),
-    clear_existing: bool = Query(False, description="Clear documents in database before upload"),
+    preserve_tables: bool = True,
+    use_ocr: bool = False,
+    chunking_strategy: str = Query(..., description="分块策略: 必须指定 'fixed_size' 或 'intelligent'"),
+    chunk_size: int = Query(1000, description="固定分块尺寸"),
+    chunk_overlap: int = Query(200, description="固定分块重叠大小"),
+    save_to_database: bool = Query(True, description="是否保存到数据库"),
     db: Session = Depends(get_db),
+    vector_service: VectorService = Depends(get_vector_service),
+    x_chunking_strategy: Optional[str] = Header(None, description="分块策略的header参数")
 ):
-    """Upload PDF file, parse content and store to vector database
-    
-    Upload PDF file, extract text content, process and store to vector database for later retrieval
-    
-    Parameters:
-        file: PDF file to upload
-        use_intelligent_chunking: Whether to use Gemini for intelligent chunking
-        chunk_size: If not using intelligent chunking, fixed chunk size
-        overlap: If not using intelligent chunking, fixed overlap size
-        clear_existing: Clear database before upload, default False
-        db: Database session
-        
+    """上传和处理PDF文件
+
+    Args:
+        file: 要上传的PDF文件
+        preserve_tables: 保留表格结构，默认为True
+        use_ocr: 是否使用OCR处理扫描文档，默认为False
+        chunking_strategy: 分块策略，必须指定 'fixed_size' 或 'intelligent'
+        chunk_size: 固定分块尺寸，默认1000
+        chunk_overlap: 固定分块重叠大小，默认200
+        save_to_database: 是否保存到数据库，默认True
+        x_chunking_strategy: Header中指定的分块策略，优先级高于查询参数
+
     Returns:
-        Dict: Dictionary containing processing result, including file name, processed chunk count, document ID list, etc
-        
-    Exceptions:
-        HTTPException: If processing PDF file fails
+        包含提取文本的JSON响应
     """
+    # 检查文件类型
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="只接受PDF文件")
+    
+    # 调用通用文件上传处理函数
+    return await upload_file(
+        file=file,
+        preserve_tables=preserve_tables,
+        use_ocr=use_ocr,
+        chunking_strategy=chunking_strategy,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        save_to_database=save_to_database,
+        db=db,
+        vector_service=vector_service,
+        x_chunking_strategy=x_chunking_strategy
+    )
+
+@router.post("/upload_file", 
+            response_model=Dict[str, Any], 
+            summary="上传和处理各种文件", 
+            description="上传各种文件(PDF、TXT、DOCX、CSV等)，解析内容并存储到向量数据库，支持智能分块",
+            response_description="返回处理结果，包括文件名、处理的区块数量和文档ID列表")
+async def upload_file(
+    file: UploadFile = File(...),
+    preserve_tables: bool = True,
+    use_ocr: bool = False,
+    chunking_strategy: str = Query(..., description="分块策略: 必须指定 'fixed_size' 或 'intelligent'"),
+    chunk_size: int = Query(1000, description="固定分块尺寸"),
+    chunk_overlap: int = Query(200, description="固定分块重叠大小"),
+    save_to_database: bool = Query(True, description="是否保存到数据库"),
+    db: Session = Depends(get_db),
+    vector_service: VectorService = Depends(get_vector_service),
+    x_chunking_strategy: Optional[str] = Header(None, description="分块策略的header参数")
+):
+    """上传和处理各种文件
+
+    Args:
+        file: 要上传的文件（支持PDF、TXT、DOCX、CSV等）
+        preserve_tables: 保留表格结构，默认为True
+        use_ocr: 是否使用OCR处理扫描文档，默认为False
+        chunking_strategy: 分块策略，必须指定 'fixed_size' 或 'intelligent'
+        chunk_size: 固定分块尺寸，默认1000
+        chunk_overlap: 固定分块重叠大小，默认200
+        save_to_database: 是否保存到数据库，默认True
+        x_chunking_strategy: Header中指定的分块策略，优先级高于查询参数
+
+    Returns:
+        包含提取文本的JSON响应
+    """
+    # 如果header中提供了chunking_strategy，则覆盖查询参数
+    if x_chunking_strategy:
+        chunking_strategy = x_chunking_strategy
+        print(f"使用header中指定的chunking_strategy: {chunking_strategy}")
+    
+    # 验证分块策略参数
+    valid_strategies = ["fixed_size", "intelligent"]
+    if chunking_strategy not in valid_strategies:
+        raise HTTPException(status_code=400, detail=f"无效的分块策略: {chunking_strategy}，有效选项为 {', '.join(valid_strategies)}")
+    
+    print(f"使用分块策略: {chunking_strategy}, 保存到数据库: {save_to_database}")
+    
+    # 检查文件类型
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    print(f"上传文件: {file.filename}, 扩展名: {file_ext}")
+    
+    # 获取文件MIME类型
+    mime_type = file.content_type or ""
+    print(f"文件MIME类型: {mime_type}")
+    
+    # 保存上传的文件到临时目录
+    temp_file_path = f"/tmp/{uuid.uuid4()}{file_ext}"
+    content = await file.read()
+    
+    with open(temp_file_path, "wb") as f:
+        f.write(content)
+    
+    extracted_text = ""
     try:
-        # If specified clear database
-        if clear_existing:
-            try:
-                # Check if document_chunks table exists
-                inspector = inspect(db.bind)
-                tables = inspector.get_table_names()
-                chunks_exists = "document_chunks" in tables
+        # 根据文件类型处理文件
+        if file_ext == '.pdf':
+            # PDF文件处理
+            if len(content) < 4 or content[:4] != b'%PDF':
+                raise HTTPException(status_code=400, detail="无效的PDF文件格式")
                 
-                # Use CASCADE parameter to handle foreign key dependencies
-                if chunks_exists:
-                    db.execute(text("TRUNCATE TABLE documents CASCADE"))
-                else:
-                    db.execute(text("TRUNCATE TABLE documents RESTART IDENTITY"))
-                db.commit()
-                print(f"Cleared database, preparing to import new document: {file.filename}")
+            # 使用异常处理捕获PDF读取错误
+            try:
+                # 首先尝试使用PyPDF2提取文本（基本提取）
+                pdf_reader = PyPDF2.PdfReader(temp_file_path)
+                page_count = len(pdf_reader.pages)
+                print(f"成功打开PDF，页数: {page_count}")
+                basic_text = ""
+                for page in pdf_reader.pages:
+                    try:
+                        page_text = page.extract_text()
+                        if page_text:
+                            basic_text += page_text + "\n\n"
+                    except Exception as e:
+                        print(f"处理PDF页面时出错: {e}")
+                        continue
             except Exception as e:
-                db.rollback()
-                print(f"Failed to clear database: {e}")
-                # Continue processing, do not block upload
-        
-        # Check file type
-        if not file.filename.endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="Only PDF files are supported")
-            
-        # Read PDF content
-        content = await file.read()
-        pdf_reader = PyPDF2.PdfReader(BytesIO(content))
-        
-        # Extract text
-        text = ""
-        for page in pdf_reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
-            
-        # If text is empty
-        if not text.strip():
-            raise HTTPException(status_code=400, detail="Cannot extract text from PDF")
-        
-        # Document ID to store in vector database
-        document_ids = []
-            
-        # Try using intelligent chunking strategy
-        chunking_method = "fixed_size"  # Default to fixed chunk
-        
-        if use_intelligent_chunking:
-            try:
-                print("Starting intelligent chunking...")
-                chunks = await gemini_service.intelligent_chunking(text, "pdf")
+                error_msg = str(e)
+                if "EOF" in error_msg or "marker" in error_msg:
+                    raise HTTPException(status_code=400, detail=f"PDF文件损坏或不完整: {error_msg}")
+                else:
+                    raise HTTPException(status_code=400, detail=f"无法读取PDF文件: {error_msg}")
                 
-                if chunks and len(chunks) > 0:
-                    print(f"Intelligent chunking succeeded, generated {len(chunks)} chunks")
-                    chunking_method = "intelligent"
-                    
-                    # Store chunk content
-                    batch_size = 10  # Chunks to process per batch
-                    
-                    # Optimization: If too many chunks, first perform sampling test to reduce API calls
-                    if len(chunks) > 50:
-                        print(f"Document has many chunks ({len(chunks)}), first process sample chunks to avoid exceeding quota")
-                        # Take sample chunks for processing (first 5, middle 5, and last 5)
-                        sample_indices = list(range(0, 5)) + list(range(len(chunks)//2-2, len(chunks)//2+3)) + list(range(len(chunks)-5, len(chunks)))
-                        sample_chunks = [chunks[i] for i in sample_indices]
-                        
-                        # Process sample chunks
-                        for i, chunk_index in enumerate(sample_indices):
-                            chunk_data = chunks[chunk_index]
-                            document = await vector_service.add_document(
-                                db, 
-                                content=chunk_data["content"], 
-                                metadata={
-                                    "source": file.filename,
-                                    "chunk": chunk_index + 1,
-                                    "total_chunks": len(chunks),
-                                    "strategy": "intelligent_chunking_sample",
-                                    "pdf_filename": file.filename,  # Add file name field
-                                    "import_timestamp": datetime.now().isoformat(),  # Add import timestamp
-                                    **chunk_data.get("metadata", {})
-                                }
-                            )
-                            document_ids.append(document.id)
+            # 尝试使用pdfplumber进行更高级的提取
+            try:
+                import pdfplumber
+                extracted_text = ""
+                with pdfplumber.open(temp_file_path) as pdf:
+                    for page in pdf.pages:
+                        try:
+                            # 处理表格（如果需要保留表格）
+                            if preserve_tables:
+                                tables = page.extract_tables()
+                                if tables:
+                                    for table in tables:
+                                        # 将表格格式化为文本
+                                        extracted_text += "<TABLE>\n"
+                                        for row in table:
+                                            row_text = "\t".join([str(cell) if cell else "" for cell in row])
+                                            extracted_text += row_text + "\n"
+                                        extracted_text += "</TABLE>\n\n"
                             
-                        # Return only sample chunk results
-                        return {
-                            "success": True,
-                            "filename": file.filename,
-                            "chunks_processed": len(sample_indices),
-                            "document_ids": document_ids,
-                            "chunking_method": "intelligent_sampling",
-                            "total_chunks": len(chunks),
-                            "processed_chunks": len(sample_indices),
-                            "note": "Since document has many chunks, only processed some sample chunks to avoid API quota limit"
-                        }
-                    
-                    # If chunk count is moderate, process all chunks in batches
-                    for i in range(0, len(chunks), batch_size):
-                        batch = chunks[i:i+batch_size]
-                        print(f"Processing batch {i//batch_size + 1}/{(len(chunks) + batch_size - 1)//batch_size}, size: {len(batch)}")
-                        
-                        # Process batch in parallel
-                        tasks = []
-                        for j, chunk_data in enumerate(batch):
-                            chunk_index = i + j
-                            task = vector_service.add_document(
-                                db, 
-                                content=chunk_data["content"], 
-                                metadata={
-                                    "source": file.filename,
-                                    "chunk": chunk_index + 1,
-                                    "total_chunks": len(chunks),
-                                    "strategy": "intelligent_chunking",
-                                    "pdf_filename": file.filename,  # Add file name field
-                                    "import_timestamp": datetime.now().isoformat(),  # Add import timestamp
-                                    **chunk_data.get("metadata", {})
-                                }
-                            )
-                            tasks.append(task)
-                        
-                        # Wait for batch completion
-                        batch_results = await asyncio.gather(*tasks, return_exceptions=True)
-                        
-                        # Process results
-                        for result in batch_results:
-                            if isinstance(result, Exception):
-                                print(f"Failed to process chunk: {result}")
-                            else:
-                                document_ids.append(result.id)
-                        
-                        # Brief delay between batches to avoid sending requests too quickly
-                        if i + batch_size < len(chunks):
-                            await asyncio.sleep(1)
-                    
-                    return {
-                        "success": True,
-                        "filename": file.filename,
-                        "chunks_processed": len(chunks),
-                        "document_ids": document_ids,
-                        "chunking_method": chunking_method
-                    }
-                else:
-                    print("Intelligent chunking returned empty result, falling back to fixed chunk")
+                            # 提取页面文本
+                            page_text = page.extract_text() or ""
+                            if page_text:
+                                extracted_text += page_text + "\n\n"
+                        except Exception as e:
+                            print(f"使用pdfplumber处理页面时出错: {e}")
+                            continue
             except Exception as e:
-                print(f"Intelligent chunking failed: {e}, falling back to fixed chunk")
-        
-        # Use traditional fixed size chunking (as fallback or default method)
-        print(f"Using fixed chunking: chunk_size={chunk_size}, overlap={overlap}")
-        chunks = []
-        sentences = text.replace('\n', ' ').split('. ')
-        current_chunk = ""
-        
-        for sentence in sentences:
-            if len(current_chunk) + len(sentence) < chunk_size:
-                current_chunk += sentence + ". "
-            else:
-                chunks.append(current_chunk)
-                # Keep some overlap to maintain context continuity
-                current_chunk = current_chunk[-overlap:] if overlap > 0 else ""
-                current_chunk += sentence + ". "
+                print(f"pdfplumber提取失败，使用基本提取文本: {e}")
+                extracted_text = basic_text
                 
-        # Add last chunk
-        if current_chunk:
-            chunks.append(current_chunk)
+            # 如果两种方法都没有提取到文本，使用基本文本
+            if not extracted_text.strip():
+                print("pdfplumber没有提取到文本，使用PyPDF2提取的基本文本")
+                extracted_text = basic_text
             
-        # Store to vector database
-        for i, chunk in enumerate(chunks):
-            document = await vector_service.add_document(
-                db, 
-                content=chunk, 
-                metadata={
-                    "source": file.filename,
-                    "chunk": i + 1,
-                    "total_chunks": len(chunks),
-                    "strategy": "fixed_size",
-                    "chunk_size": chunk_size,
-                    "overlap": overlap,
-                    "pdf_filename": file.filename,  # Add file name field
-                    "import_timestamp": datetime.now().isoformat()  # Add import timestamp
-                }
-            )
-            document_ids.append(document.id)
-            
-        return {
-            "success": True,
-            "filename": file.filename,
-            "chunks_processed": len(chunks),
-            "document_ids": document_ids,
-            "chunking_method": "fixed_size",
-            "chunk_size": chunk_size,
-            "overlap": overlap
-        }
+            # 如果使用OCR但文本提取为空，尝试OCR（需要实现）
+            if use_ocr and not extracted_text.strip():
+                # 这里可以添加OCR处理代码
+                pass
+                
+        elif file_ext == '.txt':
+            # 文本文件处理
+            with open(temp_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                extracted_text = f.read()
+                
+        elif file_ext == '.csv':
+            # CSV文件处理
+            try:
+                import pandas as pd
+                df = pd.read_csv(temp_file_path)
+                # 转换为文本格式，保留表格结构
+                extracted_text = df.to_string(index=False)
+            except Exception as e:
+                print(f"处理CSV文件时出错: {e}")
+                # 尝试使用基本方法读取
+                with open(temp_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    extracted_text = f.read()
+                
+        elif file_ext in ['.docx', '.doc']:
+            # Word文档处理
+            try:
+                from docx import Document
+                doc = Document(temp_file_path)
+                paragraphs = [p.text for p in doc.paragraphs]
+                extracted_text = '\n\n'.join(paragraphs)
+                
+                # 如果需要保留表格
+                if preserve_tables and doc.tables:
+                    extracted_text += "\n\n"
+                    for table in doc.tables:
+                        extracted_text += "<TABLE>\n"
+                        for row in table.rows:
+                            row_text = '\t'.join(cell.text for cell in row.cells)
+                            extracted_text += row_text + '\n'
+                        extracted_text += "</TABLE>\n\n"
+            except Exception as e:
+                print(f"处理Word文档时出错: {e}")
+                raise HTTPException(status_code=400, detail=f"无法处理Word文档: {str(e)}")
+                
+        elif file_ext == '.xlsx' or file_ext == '.xls':
+            # Excel文件处理
+            try:
+                import pandas as pd
+                # 读取所有工作表
+                excel_file = pd.ExcelFile(temp_file_path)
+                sheet_texts = []
+                
+                for sheet_name in excel_file.sheet_names:
+                    df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                    sheet_text = f"工作表: {sheet_name}\n"
+                    sheet_text += "<TABLE>\n"
+                    sheet_text += df.to_string(index=False)
+                    sheet_text += "\n</TABLE>\n\n"
+                    sheet_texts.append(sheet_text)
+                
+                extracted_text = '\n\n'.join(sheet_texts)
+            except Exception as e:
+                print(f"处理Excel文件时出错: {e}")
+                raise HTTPException(status_code=400, detail=f"无法处理Excel文件: {str(e)}")
+                
+        else:
+            # 尝试作为纯文本文件处理
+            try:
+                with open(temp_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    extracted_text = f.read()
+                print(f"未知文件类型 {file_ext}，尝试作为纯文本处理")
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"不支持的文件类型 {file_ext}: {str(e)}")
+    
+    finally:
+        # 清理临时文件
+        try:
+            os.remove(temp_file_path)
+        except:
+            pass
+    
+    if not extracted_text.strip():
+        raise HTTPException(status_code=400, detail="无法从文件提取文本")
         
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process PDF file: {str(e)}")
+    # 分块处理文本
+    MAX_CHUNK_SIZE = 30000  # 约30k字符
+    chunks = []
+    document_ids = []
+    
+    # 根据策略选择分块方法
+    if chunking_strategy == "fixed_size":
+        # 固定大小分块
+        if len(extracted_text) > chunk_size:
+            paragraphs = re.split(r'\n\s*\n', extracted_text)
+            current_chunk = ""
+            
+            for para in paragraphs:
+                if len(current_chunk) + len(para) < chunk_size:
+                    current_chunk += para + "\n\n"
+                else:
+                    if current_chunk:
+                        chunks.append(current_chunk.strip())
+                    # 可以选择添加重叠部分
+                    if chunk_overlap > 0 and current_chunk:
+                        # 获取最后几个段落作为重叠部分
+                        overlap_paras = current_chunk.split('\n\n')[-3:]  # 取最后3个段落
+                        current_chunk = '\n\n'.join(overlap_paras) + '\n\n' + para + '\n\n'
+                    else:
+                        current_chunk = para + "\n\n"
+            
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+        else:
+            chunks = [extracted_text.strip()]
+            
+    elif chunking_strategy == "intelligent":
+        try:
+            print(f"使用智能分块策略处理文件（文件类型：{file.filename}，文本长度：{len(extracted_text)}字符）")
+            file_type = file_ext.lstrip('.')
+            chunks = await gemini_service.intelligent_chunking(extracted_text, file_type)
+            print(f"智能分块完成，生成了{len(chunks)}个块")
+            
+            # 记录分块策略信息
+            for i, chunk in enumerate(chunks):
+                print(f"块 {i+1}/{len(chunks)}: 策略={chunk['metadata'].get('strategy', 'unknown')}, 大小={len(chunk['content'])}字符")
+            
+            # 不保存到数据库时，直接返回分块结果
+            if not save_to_database:
+                return {
+                    "filename": file.filename,
+                    "text_chunks": chunks,
+                    "chunk_strategy": "intelligent",
+                    "document_ids": []
+                }
+        except Exception as e:
+            print(f"智能分块失败，尝试固定尺寸分块: {e}")
+            # 回退到固定尺寸分块
+            if len(extracted_text) > chunk_size:
+                current_pos = 0
+                while current_pos < len(extracted_text):
+                    chunk_end = min(current_pos + chunk_size, len(extracted_text))
+                    chunks.append(extracted_text[current_pos:chunk_end].strip())
+                    current_pos += chunk_size - chunk_overlap
+            else:
+                chunks = [extracted_text.strip()]
+    else:
+        # 这部分逻辑不应该执行，因为我们已经在前面验证了策略
+        raise HTTPException(status_code=400, detail=f"无效的分块策略: {chunking_strategy}")
+    
+    # 如果使用智能分块，处理已经生成的结构化块
+    if chunking_strategy == "intelligent" and isinstance(chunks, list) and chunks and isinstance(chunks[0], dict):
+        pass  # 已经是正确格式的块
+    else:
+        # 转换纯文本块为所需的字典格式
+        chunks = [
+            {
+                "content": chunk,
+                "metadata": {
+                    "source": file.filename,
+                    "chunk": i+1,
+                    "total_chunks": len(chunks),
+                    "strategy": chunking_strategy,  # 确保策略正确传递
+                    "chunk_size": chunk_size if chunking_strategy == "fixed_size" else None,
+                    "overlap": chunk_overlap if chunking_strategy == "fixed_size" else None,
+                    "file_type": file_ext.lstrip('.'),
+                    "import_timestamp": datetime.now().strftime("%Y%m%d%H%M%S")
+                }
+            }
+            for i, chunk in enumerate(chunks)
+        ]
+    
+    # 保存到数据库
+    if save_to_database:
+        try:
+            processed_chunks = []
+            for chunk in chunks:
+                # 处理metadata格式
+                if isinstance(chunk, dict) and "content" in chunk:
+                    content = chunk["content"]
+                    metadata = chunk.get("metadata", {})
+                else:
+                    content = chunk
+                    metadata = {
+                        "source": file.filename,
+                        "strategy": chunking_strategy
+                    }
+                
+                # 确保metadata中包含文件名和时间戳
+                if "source" not in metadata:
+                    metadata["source"] = file.filename
+                if "import_timestamp" not in metadata:
+                    metadata["import_timestamp"] = datetime.now().strftime("%Y%m%d%H%M%S")
+                
+                # 移除auto策略的相关代码，因为已不存在这种情况
+                metadata["strategy"] = chunking_strategy
+                
+                processed_chunks.append({
+                    "content": content,
+                    "metadata": metadata,
+                    "chunking_strategy": chunking_strategy  # 明确传递用户指定的策略
+                })
+            
+            # 批量保存文档
+            result = await vector_service.add_documents(db, processed_chunks)
+            
+            # 收集文档ID
+            for doc in result:
+                if hasattr(doc, 'id'):
+                    document_ids.append(doc.id)
+                elif isinstance(doc, dict) and "id" in doc:
+                    document_ids.append(doc["id"])
+        except Exception as e:
+            print(f"保存文档到数据库失败: {e}")
+            traceback.print_exc()
+            # 返回处理结果，但提示保存失败
+            return {
+                "filename": file.filename,
+                "text_chunks": chunks,
+                "chunk_strategy": chunking_strategy,
+                "document_ids": [],
+                "error": f"保存到数据库失败: {str(e)}"
+            }
+    
+    return {
+        "filename": file.filename,
+        "text_chunks": chunks,
+        "chunk_strategy": chunking_strategy,
+        "document_ids": document_ids
+    }
 
 @router.post("/analyze-documents", 
             response_model=CompletionResponse, 
@@ -828,6 +1121,7 @@ async def upload_pdf(
 async def analyze_documents(
     request: QueryRequest,
     db: Session = Depends(get_db),
+    vector_service: VectorService = Depends(get_vector_service),
 ):
     """
     Deeply analyze document content, extract key concepts and themes
@@ -837,6 +1131,7 @@ async def analyze_documents(
     Parameters:
         request: Request object containing query text and limit count
         db: Database session
+        vector_service: Vector service instance
         
     Returns:
         CompletionResponse: Response object containing detailed analysis result
@@ -882,7 +1177,11 @@ Note: If document content is truncated or incomplete, please indicate in the ans
             summary="Clear AlloyDB", 
             description="Clear all data tables in AlloyDB, this is a dangerous operation, need to confirm parameters",
             response_description="Returns operation result information")
-async def clear_alloydb(confirmation: str = Query(..., description="Confirm string, must be 'confirm_clear_alloydb'")):
+async def clear_alloydb(
+    confirmation: str = Query(..., description="Confirm string, must be 'confirm_clear_alloydb'"),
+    backup: bool = Query(False, description="Whether to backup data before clearing"),
+    db: Session = Depends(get_db)
+):
     """
     Clear all data tables in AlloyDB. Extremely cautious use!
     
@@ -890,6 +1189,8 @@ async def clear_alloydb(confirmation: str = Query(..., description="Confirm stri
     
     Parameters:
         confirmation: Confirm string, must be 'confirm_clear_alloydb'
+        backup: Whether to backup data before clearing
+        db: Database session
         
     Returns:
         Dict: Dictionary containing operation result information
@@ -901,22 +1202,45 @@ async def clear_alloydb(confirmation: str = Query(..., description="Confirm stri
         raise HTTPException(status_code=400, detail="Need to confirm parameters to execute this operation")
     
     try:
+        # 检查是否在生产环境
+        if os.getenv("ENVIRONMENT") == "production":
+            raise HTTPException(
+                status_code=403, 
+                detail="Cannot clear database in production environment"
+            )
+        
         deleted_tables = 0
         table_counts = {}
         
         with engine.connect() as connection:
-            # Get all table names
+            # 获取所有表名
             inspector = inspect(engine)
             tables = inspector.get_table_names()
             
-            # First delete tables not referenced (no foreign key dependencies)
+            # 如果需要备份
+            if backup:
+                backup_dir = os.getenv("DB_BACKUP_DIR", "/tmp/db_backups")
+                os.makedirs(backup_dir, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                
+                for table in tables:
+                    backup_file = os.path.join(backup_dir, f"{table}_{timestamp}.csv")
+                    try:
+                        connection.execute(
+                            text(f"COPY {table} TO '{backup_file}' WITH CSV HEADER")
+                        )
+                        print(f"Backed up table {table} to {backup_file}")
+                    except Exception as e:
+                        print(f"Failed to backup table {table}: {e}")
+            
+            # 删除表
             for table in tables:
                 try:
-                    # Get record count in table
+                    # 获取记录数
                     count = connection.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()
                     table_counts[table] = count
                     
-                    # Use DELETE instead of TRUNCATE
+                    # 使用 DELETE 而不是 TRUNCATE
                     connection.execute(text(f"DELETE FROM {table}"))
                     deleted_tables += 1
                 except Exception as e:
@@ -928,7 +1252,8 @@ async def clear_alloydb(confirmation: str = Query(..., description="Confirm stri
                 "status": "success", 
                 "deleted_tables": deleted_tables,
                 "table_counts": table_counts,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "backup_performed": backup
             }
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=f"Failed to clear AlloyDB: {str(e)}")
@@ -938,7 +1263,7 @@ async def clear_alloydb(confirmation: str = Query(..., description="Confirm stri
            summary="Get Single Document", 
            description="Get detailed information about a single document based on ID",
            response_description="Returns document details")
-async def get_document(document_id: int = Path(..., description="Document ID"), db: Session = Depends(get_db)):
+async def get_document(document_id: int = PathParam(..., description="Document ID"), db: Session = Depends(get_db)):
     """
     Get document by specified ID
     
@@ -1004,7 +1329,7 @@ async def get_document(document_id: int = Path(..., description="Document ID"), 
              summary="Delete Document", 
              description="Delete specified document from the database",
              response_description="Returns status of the deletion operation")
-async def delete_document(document_id: int = Path(..., description="Document ID"), db: Session = Depends(get_db)):
+async def delete_document(document_id: int = PathParam(..., description="Document ID"), db: Session = Depends(get_db)):
     """
     Delete document by ID
     
@@ -1049,4 +1374,522 @@ async def delete_document(document_id: int = Path(..., description="Document ID"
         raise
     except Exception as e:
         db.rollback()  # 确保在发生错误时回滚事务
-        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
+
+@router.post("/upload-dual-chunking", 
+            response_model=Dict[str, Any], 
+            summary="上传使用双重分块策略的文档", 
+            description="上传PDF文档并同时使用固定尺寸分块和智能分块进行处理，方便后续比较不同策略的检索效果。注意：此端点仅支持PDF文件格式。",
+            response_description="返回处理结果，包括文件名、处理的区块数量和文档ID列表")
+async def upload_dual_chunking(
+    file: UploadFile = File(...),
+    fixed_chunk_size: int = Query(1000, description="固定尺寸分块的块大小"),
+    fixed_overlap: int = Query(200, description="固定尺寸分块的重叠大小"),
+    db: Session = Depends(get_db),
+    vector_service: VectorService = Depends(get_vector_service),
+):
+    """
+    上传文档并同时使用固定尺寸分块和智能分块进行处理
+    
+    参数:
+        file: 上传的PDF文件（仅支持.pdf格式）
+        fixed_chunk_size: 固定尺寸分块的块大小
+        fixed_overlap: 固定尺寸分块的重叠大小
+        db: 数据库会话
+    
+    返回:
+        包含处理结果的对象
+    
+    异常:
+        HTTPException: 如果文件处理失败或文件类型不支持
+    """
+    print(f"\n{'='*50}")
+    print(f"开始处理文件: {file.filename}")
+    print(f"固定分块大小: {fixed_chunk_size}, 重叠大小: {fixed_overlap}")
+    print(f"{'='*50}\n")
+    
+    try:
+        # 检查文件类型
+        file_extension = os.path.splitext(file.filename)[1].lower()
+        if file_extension != '.pdf':
+            print(f"错误：不支持的文件类型 {file_extension}")
+            raise HTTPException(status_code=400, detail=f"不支持的文件类型：{file_extension}。upload-dual-chunking端点仅支持PDF文件格式（.pdf）。")
+            
+        # 读取文件内容
+        print("正在读取文件内容...")
+        file_content = await file.read()
+        print(f"文件大小: {len(file_content)} 字节")
+        
+        # 文件名时间戳
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        print(f"处理时间戳: {timestamp}")
+        
+        # 创建临时文件
+        print("创建临时文件...")
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+            temp_file.write(file_content)
+            temp_path = temp_file.name
+            print(f"临时文件路径: {temp_path}")
+            
+        try:
+            # 打开PDF
+            print("正在打开PDF文件...")
+            with open(temp_path, 'rb') as f:
+                pdf = PyPDF2.PdfReader(f)
+                num_pages = len(pdf.pages)
+                print(f"PDF文件包含 {num_pages} 页")
+                
+                # 提取PDF文本
+                print("开始提取PDF文本...")
+                full_text = ""
+                for i in range(num_pages):
+                    page = pdf.pages[i]
+                    page_text = page.extract_text()
+                    if page_text:
+                        full_text += page_text + "\n\n"
+                    print(f"已处理第 {i+1}/{num_pages} 页")
+                
+                print(f"文本提取完成，总长度: {len(full_text)} 字符")
+                
+                # 使用固定尺寸分块
+                print("\n开始固定尺寸分块处理...")
+                fixed_chunks = []
+                for i in range(0, len(full_text), fixed_chunk_size - fixed_overlap):
+                    chunk_text = full_text[i:i + fixed_chunk_size]
+                    if chunk_text.strip():
+                        fixed_chunks.append({
+                            "content": chunk_text,
+                            "metadata": {
+                                "source": file.filename,
+                                "pdf_filename": file.filename,
+                                "chunk": len(fixed_chunks) + 1,
+                                "import_timestamp": timestamp,
+                                "page_range": f"PDF extraction does not track exact page mapping",
+                                "strategy": "fixed_size",
+                                "chunk_size": fixed_chunk_size,
+                                "overlap": fixed_overlap
+                            }
+                        })
+                print(f"固定尺寸分块完成，生成 {len(fixed_chunks)} 个块")
+                
+                # 使用Gemini智能分块
+                print("\n开始智能分块处理...")
+                intelligent_chunks = await gemini_service.intelligent_chunking(full_text, "pdf")
+                print(f"智能分块完成，生成 {len(intelligent_chunks)} 个块")
+                
+                for i, chunk in enumerate(intelligent_chunks):
+                    # 添加额外的元数据
+                    chunk["metadata"].update({
+                        "source": file.filename,
+                        "pdf_filename": file.filename,
+                        "import_timestamp": timestamp,
+                        "page_range": f"PDF extraction does not track exact page mapping"
+                    })
+                
+                # 过滤掉空内容的智能分块
+                valid_intelligent_chunks = []
+                for i, chunk in enumerate(intelligent_chunks):
+                    if chunk.get("content") and chunk["content"].strip():
+                        valid_intelligent_chunks.append(chunk)
+                    else:
+                        print(f"警告：跳过智能分块 {i+1}，内容为空")
+                
+                print(f"有效智能分块数量: {len(valid_intelligent_chunks)}/{len(intelligent_chunks)}")
+                
+                # 存储固定尺寸分块到数据库
+                print("\n开始存储固定尺寸分块到数据库...")
+                fixed_doc_ids = []
+                for i, chunk in enumerate(fixed_chunks):
+                    print(f"存储固定尺寸分块 {i+1}/{len(fixed_chunks)}")
+                    doc = await vector_service.add_document(
+                        db, 
+                        chunk["content"], 
+                        chunk["metadata"],
+                        "fixed_size"
+                    )
+                    fixed_doc_ids.append(doc.id)
+                print(f"固定尺寸分块存储完成，共 {len(fixed_doc_ids)} 个文档")
+                
+                # 存储智能分块到数据库
+                print("\n开始存储智能分块到数据库...")
+                intelligent_doc_ids = []
+                for i, chunk in enumerate(valid_intelligent_chunks):
+                    print(f"存储智能分块 {i+1}/{len(valid_intelligent_chunks)}")
+                    try:
+                        doc = await vector_service.add_document(
+                            db, 
+                            chunk["content"], 
+                            chunk["metadata"],
+                            "intelligent"
+                        )
+                        intelligent_doc_ids.append(doc.id)
+                    except ValueError as e:
+                        print(f"警告：存储智能分块 {i+1} 失败: {str(e)}")
+                        # 如果是内容为空的错误，继续处理下一个分块
+                        if "empty" in str(e).lower():
+                            continue
+                        else:
+                            raise
+                print(f"智能分块存储完成，共 {len(intelligent_doc_ids)} 个文档")
+                
+                # 返回处理结果
+                result = {
+                    "filename": file.filename,
+                    "file_size": len(file_content),
+                    "text_length": len(full_text),
+                    "fixed_size_chunks": {
+                        "count": len(fixed_chunks),
+                        "chunk_size": fixed_chunk_size,
+                        "overlap": fixed_overlap,
+                        "doc_ids": fixed_doc_ids
+                    },
+                    "intelligent_chunks": {
+                        "count": len(intelligent_chunks),
+                        "doc_ids": intelligent_doc_ids
+                    },
+                    "status": "success"
+                }
+                
+                print("\n处理完成！")
+                print(f"固定尺寸分块数: {len(fixed_chunks)}")
+                print(f"智能分块数: {len(intelligent_chunks)}")
+                print(f"总文本长度: {len(full_text)} 字符")
+                print(f"{'='*50}\n")
+                
+                return result
+        finally:
+            # 删除临时文件
+            print("清理临时文件...")
+            os.unlink(temp_path)
+            print("临时文件已删除")
+    except Exception as e:
+        # 处理异常
+        error_message = f"处理文件失败: {str(e)}"
+        print(f"\n错误: {error_message}")
+        traceback.print_exc()
+        print(f"{'='*50}\n")
+        
+        # 检查是否已经是HTTPException
+        if isinstance(e, HTTPException):
+            raise e
+            
+        # 提供更好的错误消息
+        if "PDF" in str(e) or "pdf" in str(e):
+            raise HTTPException(status_code=500, detail=f"PDF处理失败: {str(e)}。请确保您的PDF文件完整且未损坏。")
+        else:
+            raise HTTPException(status_code=500, detail=error_message)
+
+@router.post("/compare-strategies", 
+            response_model=Dict[str, Any], 
+            summary="比较不同分块策略的检索效果", 
+            description="对同一个查询使用不同的分块策略进行检索，并对比结果",
+            response_description="返回不同策略的检索结果和对比分析")
+async def compare_strategies(
+    query_request: QueryRequest,
+    vector_service: VectorService = Depends(get_vector_service)
+):
+    """对比不同的搜索策略并返回结果"""
+    result = await vector_service.compare_search_strategies(
+        query_request.query,
+        query_request.limit
+    )
+    
+    return result 
+
+@router.get("/benchmark", 
+            response_class=HTMLResponse,
+            summary="向量搜索基准测试页面", 
+            description="提供向量搜索基准测试的Web界面，可以运行测试并查看结果",
+            response_description="返回基准测试页面或结果")
+async def benchmark_page(
+    request: Request,
+    run_test: bool = Query(False, description="是否执行基准测试"),
+    questions: Optional[str] = Query(None, description="测试问题，用分号分隔"),
+    limit: int = Query(5, description="每个查询返回的最大结果数"),
+    source_filter: Optional[str] = Query(None, description="源文档过滤条件")
+):
+    """
+    向量搜索基准测试页面
+    
+    提供向量搜索基准测试的Web界面，可以运行测试并查看结果
+    
+    Parameters:
+        request: FastAPI请求对象
+        run_test: 是否执行基准测试
+        questions: 测试问题，用分号分隔
+        limit: 每个查询返回的最大结果数
+        source_filter: 源文档过滤条件
+        
+    Returns:
+        HTMLResponse: 基准测试页面或结果
+    """
+    
+    # 如果不是请求运行测试，则返回测试表单页面
+    if not run_test:
+        return f"""
+        <!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>向量搜索基准测试</title>
+            <style>
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 20px;
+                    background-color: #f5f8fa;
+                }}
+                h1, h2, h3 {{
+                    color: #0366d6;
+                }}
+                .container {{
+                    background-color: #fff;
+                    border-radius: 8px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+                    padding: 20px;
+                    margin-bottom: 20px;
+                }}
+                input, textarea, select {{
+                    width: 100%;
+                    padding: 10px;
+                    margin-bottom: 15px;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                    box-sizing: border-box;
+                }}
+                textarea {{
+                    min-height: 150px;
+                    font-family: inherit;
+                }}
+                label {{
+                    display: block;
+                    margin-bottom: 5px;
+                    font-weight: 600;
+                }}
+                button {{
+                    background-color: #0366d6;
+                    color: white;
+                    border: none;
+                    padding: 10px 15px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-weight: 500;
+                }}
+                button:hover {{
+                    background-color: #0056b3;
+                }}
+                .footer {{
+                    text-align: center;
+                    margin-top: 30px;
+                    padding: 20px;
+                    color: #586069;
+                    font-size: 0.9em;
+                }}
+                .loading {{
+                    display: none;
+                    text-align: center;
+                    margin: 20px 0;
+                }}
+                .loading.active {{
+                    display: block;
+                }}
+                .spinner {{
+                    border: 4px solid #f3f3f3;
+                    border-top: 4px solid #0366d6;
+                    border-radius: 50%;
+                    width: 30px;
+                    height: 30px;
+                    animation: spin 2s linear infinite;
+                    margin: 0 auto;
+                }}
+                @keyframes spin {{
+                    0% {{ transform: rotate(0deg); }}
+                    100% {{ transform: rotate(360deg); }}
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>向量搜索基准测试</h1>
+                <p>此工具将对不同的分块策略进行基准测试，比较它们的检索性能。</p>
+                
+                <form id="benchmarkForm" action="/api/v1/benchmark" method="get">
+                    <input type="hidden" name="run_test" value="true">
+                    
+                    <div>
+                        <label for="questions">测试问题（每行一个问题）：</label>
+                        <textarea id="questions" name="questions" placeholder="请输入测试问题，每行一个。如果留空，将使用默认问题集。"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label for="limit">每个查询返回的最大结果数：</label>
+                        <input type="number" id="limit" name="limit" value="5" min="1" max="20">
+                    </div>
+                    
+                    <div>
+                        <label for="source_filter">源文档过滤条件（可选）：</label>
+                        <input type="text" id="source_filter" name="source_filter" placeholder="例如：document1.pdf">
+                    </div>
+                    
+                    <button type="submit" onclick="showLoading()">运行基准测试</button>
+                </form>
+                
+                <div id="loading" class="loading">
+                    <div class="spinner"></div>
+                    <p>正在运行基准测试，请稍候...</p>
+                    <p>这可能需要几分钟时间，取决于测试问题的数量和系统负载。</p>
+                </div>
+            </div>
+            
+            <div class="footer">
+                <p>Gemini Vector Search © {datetime.now().year}</p>
+            </div>
+            
+            <script>
+                function showLoading() {{
+                    document.getElementById('benchmarkForm').style.display = 'none';
+                    document.getElementById('loading').classList.add('active');
+                }}
+                
+                // 将textarea中的多行内容转换为分号分隔的格式
+                document.getElementById('benchmarkForm').addEventListener('submit', function(e) {{
+                    const textarea = document.getElementById('questions');
+                    if (textarea.value.trim()) {{
+                        textarea.value = textarea.value.split('\\n')
+                            .map(line => line.trim())
+                            .filter(line => line.length > 0)
+                            .join(';');
+                    }}
+                }});
+            </script>
+        </body>
+        </html>
+        """
+    
+    # 运行基准测试
+    try:
+        # 准备参数
+        benchmark_script = os.path.join(os.getcwd(), "benchmark_search.py")
+        report_dir = os.path.join(os.getcwd(), "static", "reports")
+        os.makedirs(report_dir, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_file = os.path.join(report_dir, f"benchmark_report_{timestamp}.html")
+        
+        # 解析问题列表
+        question_list = []
+        if questions:
+            question_list = [q.strip() for q in questions.split(";") if q.strip()]
+        
+        # 准备命令行参数
+        cmd_args = [sys.executable, benchmark_script, "--output", output_file]
+        
+        # 添加请求的URL
+        base_url = str(request.base_url).rstrip('/')
+        cmd_args.extend(["--url", base_url])
+        
+        # 添加查询限制
+        cmd_args.extend(["--limit", str(limit)])
+        
+        # 添加源文档过滤条件（如果提供）
+        if source_filter:
+            cmd_args.extend(["--source-filter", source_filter])
+        
+        # 添加问题列表（如果提供）
+        if question_list:
+            cmd_args.extend(["--questions"] + question_list)
+        
+        # 运行基准测试
+        print(f"执行基准测试命令: {' '.join(cmd_args)}")
+        process = subprocess.run(
+            cmd_args,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        # 读取生成的报告
+        with open(output_file, 'r', encoding='utf-8') as f:
+            report_content = f.read()
+        
+        return HTMLResponse(content=report_content)
+    
+    except Exception as e:
+        error_message = f"运行基准测试时出错: {str(e)}"
+        if hasattr(e, 'stdout') and e.stdout:
+            error_message += f"\n\n标准输出:\n{e.stdout}"
+        if hasattr(e, 'stderr') and e.stderr:
+            error_message += f"\n\n错误输出:\n{e.stderr}"
+        
+        return HTMLResponse(
+            content=f"""
+            <!DOCTYPE html>
+            <html lang="zh-CN">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>基准测试错误</title>
+                <style>
+                    body {{
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+                        line-height: 1.6;
+                        color: #333;
+                        max-width: 800px;
+                        margin: 0 auto;
+                        padding: 20px;
+                        background-color: #f5f8fa;
+                    }}
+                    h1 {{
+                        color: #d73a49;
+                    }}
+                    .error-container {{
+                        background-color: #fff;
+                        border-radius: 8px;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+                        padding: 20px;
+                        margin-bottom: 20px;
+                        border-left: 5px solid #d73a49;
+                    }}
+                    .error-details {{
+                        background-color: #f6f8fa;
+                        border: 1px solid #e1e4e8;
+                        border-radius: 4px;
+                        padding: 15px;
+                        overflow: auto;
+                        white-space: pre-wrap;
+                        font-family: monospace;
+                    }}
+                    .back-button {{
+                        background-color: #0366d6;
+                        color: white;
+                        border: none;
+                        padding: 10px 15px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-weight: 500;
+                        text-decoration: none;
+                        display: inline-block;
+                        margin-top: 20px;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="error-container">
+                    <h1>基准测试运行失败</h1>
+                    <p>在运行基准测试时遇到错误：</p>
+                    
+                    <div class="error-details">
+                        {error_message}
+                    </div>
+                    
+                    <a href="/api/v1/benchmark" class="back-button">返回</a>
+                </div>
+            </body>
+            </html>
+            """,
+            status_code=500
+        ) 

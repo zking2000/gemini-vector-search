@@ -166,7 +166,7 @@ class TestGeminiVectorSearchAPI:
         data = {"source": "API Test", "metadata": json.dumps({"type": "test", "automated": True})}
         
         response = requests.post(
-            f"{BASE_URL}/upload-pdf?use_intelligent_chunking=true", 
+            f"{BASE_URL}/upload-pdf?chunking_strategy=intelligent", 
             files=files,
             data=data
         )

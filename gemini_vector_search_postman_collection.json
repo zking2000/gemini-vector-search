@@ -1,0 +1,667 @@
+{
+	"info": {
+		"_postman_id": "8e5f4a3d-6c7b-4d9e-8f1a-eb2c3d4e5f6g",
+		"name": "Gemini Vector Search API",
+		"description": "API for document processing, vector search, and integration with Google Gemini 1.5 Flash model.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "系统状态",
+			"item": [
+				{
+					"name": "健康检查",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"health"
+							]
+						},
+						"description": "检查API服务是否正常运行"
+					},
+					"response": []
+				},
+				{
+					"name": "数据库状态",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/database-status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"database-status"
+							]
+						},
+						"description": "检查数据库连接是否正常"
+					},
+					"response": []
+				},
+				{
+					"name": "清除AlloyDB",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/clear-alloydb?confirmation=confirm_clear_alloydb",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"clear-alloydb"
+							],
+							"query": [
+								{
+									"key": "confirmation",
+									"value": "confirm_clear_alloydb",
+									"description": "确认字符串，必须为'confirm_clear_alloydb'"
+								}
+							]
+						},
+						"description": "清除AlloyDB中的所有数据表，这是一个危险操作"
+					},
+					"response": []
+				}
+			],
+			"description": "系统状态相关的API端点"
+		},
+		{
+			"name": "文档管理",
+			"item": [
+				{
+					"name": "上传PDF文件",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Chunking-Strategy",
+								"value": "intelligent",
+								"description": "分块策略，可选值：fixed_size, intelligent",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "/path/to/your/file.pdf",
+									"description": "要上传的PDF文件"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/upload_pdf?preserve_tables=true&use_ocr=false&chunking_strategy=intelligent&chunk_size=1000&chunk_overlap=200&save_to_database=true",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"upload_pdf"
+							],
+							"query": [
+								{
+									"key": "preserve_tables",
+									"value": "true",
+									"description": "保留表格结构"
+								},
+								{
+									"key": "use_ocr",
+									"value": "false",
+									"description": "是否使用OCR处理扫描文档"
+								},
+								{
+									"key": "chunking_strategy",
+									"value": "intelligent",
+									"description": "分块策略: 必须指定 'fixed_size' 或 'intelligent'"
+								},
+								{
+									"key": "chunk_size",
+									"value": "1000",
+									"description": "固定分块尺寸"
+								},
+								{
+									"key": "chunk_overlap",
+									"value": "200",
+									"description": "固定分块重叠大小"
+								},
+								{
+									"key": "save_to_database",
+									"value": "true",
+									"description": "是否保存到数据库"
+								}
+							]
+						},
+						"description": "上传PDF文件，解析内容并存储到向量数据库，支持智能分块"
+					},
+					"response": []
+				},
+				{
+					"name": "上传各类文件",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Chunking-Strategy",
+								"value": "intelligent",
+								"description": "分块策略，可选值：fixed_size, intelligent",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "/path/to/your/file",
+									"description": "要上传的文件（支持PDF、TXT、DOCX、CSV等）"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/upload_file?preserve_tables=true&use_ocr=false&chunking_strategy=intelligent&chunk_size=1000&chunk_overlap=200&save_to_database=true",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"upload_file"
+							],
+							"query": [
+								{
+									"key": "preserve_tables",
+									"value": "true",
+									"description": "保留表格结构"
+								},
+								{
+									"key": "use_ocr",
+									"value": "false",
+									"description": "是否使用OCR处理扫描文档"
+								},
+								{
+									"key": "chunking_strategy",
+									"value": "intelligent",
+									"description": "分块策略: 必须指定 'fixed_size' 或 'intelligent'"
+								},
+								{
+									"key": "chunk_size",
+									"value": "1000",
+									"description": "固定分块尺寸"
+								},
+								{
+									"key": "chunk_overlap",
+									"value": "200",
+									"description": "固定分块重叠大小"
+								},
+								{
+									"key": "save_to_database",
+									"value": "true",
+									"description": "是否保存到数据库"
+								}
+							]
+						},
+						"description": "上传各种文件(PDF、TXT、DOCX、CSV等)，解析内容并存储到向量数据库，支持智能分块"
+					},
+					"response": []
+				},
+				{
+					"name": "上传使用双重分块策略的文档",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "/path/to/your/file.pdf",
+									"description": "要上传的PDF文件（仅支持.pdf格式）"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/upload-dual-chunking?fixed_chunk_size=1000&fixed_overlap=200",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"upload-dual-chunking"
+							],
+							"query": [
+								{
+									"key": "fixed_chunk_size",
+									"value": "1000",
+									"description": "固定尺寸分块的块大小"
+								},
+								{
+									"key": "fixed_overlap",
+									"value": "200",
+									"description": "固定尺寸分块的重叠大小"
+								}
+							]
+						},
+						"description": "上传PDF文档并同时使用固定尺寸分块和智能分块进行处理，方便后续比较不同策略的检索效果。注意：此端点仅支持PDF文件格式。"
+					},
+					"response": []
+				},
+				{
+					"name": "添加文档",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"content\": \"这是一个测试文档内容\",\n    \"metadata\": {\n        \"source\": \"手动添加\",\n        \"type\": \"test\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/documents",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"documents"
+							]
+						},
+						"description": "向向量数据库添加单个文档，生成其嵌入向量用于后续检索"
+					},
+					"response": []
+				},
+				{
+					"name": "获取文档列表",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/documents?limit=20&offset=0&source=",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"documents"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "返回的最大文档数量"
+								},
+								{
+									"key": "offset",
+									"value": "0",
+									"description": "分页查询的偏移量"
+								},
+								{
+									"key": "source",
+									"value": "",
+									"description": "按文档源过滤，例如特定的PDF文件名"
+								}
+							]
+						},
+						"description": "获取文档列表，支持分页和源过滤"
+					},
+					"response": []
+				},
+				{
+					"name": "获取单个文档",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/documents/{{document_id}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"documents",
+								"{{document_id}}"
+							]
+						},
+						"description": "根据ID获取单个文档的详细信息"
+					},
+					"response": []
+				},
+				{
+					"name": "删除文档",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/documents/{{document_id}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"documents",
+								"{{document_id}}"
+							]
+						},
+						"description": "从数据库中删除指定文档"
+					},
+					"response": []
+				}
+			],
+			"description": "文档管理相关的API端点"
+		},
+		{
+			"name": "向量搜索",
+			"item": [
+				{
+					"name": "生成文本嵌入向量",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"text\": \"向量搜索技术\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/embedding",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"embedding"
+							]
+						},
+						"description": "将文本转换为向量表示用于向量检索"
+					},
+					"response": []
+				},
+				{
+					"name": "查询相似文档",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"query\": \"向量搜索技术\",\n    \"limit\": 5\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/query?source_filter=",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"query"
+							],
+							"query": [
+								{
+									"key": "source_filter",
+									"value": "",
+									"description": "按文档源过滤结果"
+								}
+							]
+						},
+						"description": "在向量数据库中搜索与查询文本相似的文档，并返回详细信息"
+					},
+					"response": []
+				},
+				{
+					"name": "比较分块策略",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"query\": \"向量搜索技术的优势\",\n    \"limit\": 5\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/compare-strategies",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"compare-strategies"
+							]
+						},
+						"description": "对同一个查询使用不同的分块策略进行检索，并对比结果"
+					},
+					"response": []
+				}
+			],
+			"description": "向量搜索相关的API端点"
+		},
+		{
+			"name": "Gemini AI",
+			"item": [
+				{
+					"name": "生成文本完成",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"prompt\": \"向量数据库是什么，它有哪些主要优势？\",\n  \"use_context\": true,\n  \"context_query\": \"vector database advantages\",\n  \"max_context_docs\": 5,\n  \"disable_cache\": false,\n  \"model_complexity\": \"normal\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/completion",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"completion"
+							]
+						},
+						"description": "使用Gemini 1.5 Flash模型生成文本完成，可选择使用向量数据库中的相关文档作为上下文"
+					},
+					"response": []
+				},
+				{
+					"name": "集成查询",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"prompt\": \"请解释向量数据库的工作原理\",\n  \"use_context\": true,\n  \"context_query\": \"向量数据库工作原理\",\n  \"max_context_docs\": 5,\n  \"disable_cache\": false,\n  \"model_complexity\": \"normal\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/integration?source_filter=technical_paper.pdf&debug=true&force_use_documents=false",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"integration"
+							],
+							"query": [
+								{
+									"key": "source_filter",
+									"value": "technical_paper.pdf",
+									"description": "按文档来源筛选结果"
+								},
+								{
+									"key": "debug",
+									"value": "true",
+									"description": "返回详细的调试信息"
+								},
+								{
+									"key": "force_use_documents",
+									"value": "false",
+									"description": "强制使用文档内容回答，即使没有找到高相似度匹配项"
+								}
+							]
+						},
+						"description": "集成API，结合向量检索和Gemini 1.5 Flash文本生成，可按文档来源筛选结果并返回详细的调试信息"
+					},
+					"response": []
+				},
+				{
+					"name": "分析文档内容",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"query\": \"生成关于向量搜索技术的摘要\",\n    \"limit\": 5\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/analyze-documents",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"analyze-documents"
+							]
+						},
+						"description": "深度分析文档内容，提取关键概念和主题"
+					},
+					"response": []
+				}
+			],
+			"description": "Gemini AI相关的API端点"
+		},
+		{
+			"name": "基准测试",
+			"item": [
+				{
+					"name": "向量搜索基准测试页面",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/benchmark?run_test=false&questions=&limit=5&source_filter=",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"benchmark"
+							],
+							"query": [
+								{
+									"key": "run_test",
+									"value": "false",
+									"description": "是否执行基准测试"
+								},
+								{
+									"key": "questions",
+									"value": "",
+									"description": "测试问题，用分号分隔"
+								},
+								{
+									"key": "limit",
+									"value": "5",
+									"description": "每个查询返回的最大结果数"
+								},
+								{
+									"key": "source_filter",
+									"value": "",
+									"description": "源文档过滤条件"
+								}
+							]
+						},
+						"description": "提供向量搜索基准测试的Web界面，可以运行测试并查看结果"
+					},
+					"response": []
+				}
+			],
+			"description": "基准测试相关的API端点"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://35.246.2.155:8000",
+			"type": "string"
+		}
+	]
+} 

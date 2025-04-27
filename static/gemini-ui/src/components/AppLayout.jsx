@@ -8,9 +8,11 @@ import {
   QuestionCircleOutlined,
   DatabaseOutlined,
   UserOutlined,
-  LogoutOutlined
+  LogoutOutlined,
+  BarChartOutlined
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
+import './MenuStyles.css'; // 引入自定义样式
 
 // 语言切换组件
 import LanguageSwitcher from './LanguageSwitcher';
@@ -23,6 +25,7 @@ import UploadDocument from '../pages/UploadDocument';
 import QueryAssistant from '../pages/QueryAssistant';
 import DocumentList from '../pages/DocumentList';
 import LoginCheck from '../pages/LoginCheck';
+import StrategyEvaluation from '../pages/StrategyEvaluation';
 
 const { Header, Content, Footer } = Layout;
 
@@ -40,10 +43,10 @@ const AppLayout = () => {
   const getSelectedKey = () => {
     const path = location.pathname;
     if (path === '/') return '1';
-    if (path.includes('/assistant')) return '5';
-    if (path.includes('/upload')) return '4';
+    if (path.includes('/assistant')) return '4';
+    if (path.includes('/upload')) return '3';
     if (path.includes('/documents')) return '2';
-    if (path.includes('/search')) return '3';
+    if (path.includes('/strategy-evaluation')) return '5';
     return '1';
   };
 
@@ -80,41 +83,50 @@ const AppLayout = () => {
           width: '100%',
           display: 'flex',
           alignItems: 'center',
+          paddingLeft: '10px',
+          paddingRight: '10px',
+          overflow: 'visible'
         }}
       >
-        <div className="logo" style={{ color: '#fff', fontWeight: 'bold', fontSize: '18px', marginRight: '30px' }}>
+        <div className="logo" style={{ color: '#fff', fontWeight: 'bold', fontSize: '16px', marginRight: '15px', whiteSpace: 'nowrap' }}>
           {t('home.title')}
         </div>
         <Menu
           theme="dark"
           mode="horizontal"
           selectedKeys={[getSelectedKey()]}
+          style={{
+            flex: 1,
+            minWidth: '600px',
+            padding: '0 5px',
+            gap: '0'
+          }}
           items={[
             {
               key: '1',
               icon: <HomeOutlined />,
-              label: <Link to="/">{t('nav.home')}</Link>,
-            },
-            {
-              key: '5',
-              icon: <QuestionCircleOutlined />,
-              label: <Link to="/assistant">{t('nav.queryAssistant')}</Link>,
+              label: <Link to="/" style={{ whiteSpace: 'nowrap', padding: '0 2px' }}>{t('nav.home')}</Link>,
             },
             {
               key: '4',
+              icon: <QuestionCircleOutlined />,
+              label: <Link to="/assistant" style={{ whiteSpace: 'nowrap', padding: '0 2px' }}>{t('nav.queryAssistant')}</Link>,
+            },
+            {
+              key: '3',
               icon: <UploadOutlined />,
-              label: <Link to="/upload">{t('nav.uploadDocument')}</Link>,
+              label: <Link to="/upload" style={{ whiteSpace: 'nowrap', padding: '0 2px' }}>{t('nav.uploadDocument')}</Link>,
             },
             {
               key: '2',
               icon: <DatabaseOutlined />,
-              label: <Link to="/documents">{t('nav.documentList')}</Link>,
+              label: <Link to="/documents" style={{ whiteSpace: 'nowrap', padding: '0 2px' }}>{t('nav.documentList')}</Link>,
             },
             {
-              key: '3',
-              icon: <FileSearchOutlined />,
-              label: <Link to="/search">{t('nav.documentSearch')}</Link>,
-            },
+              key: '5',
+              icon: <BarChartOutlined />,
+              label: <Link to="/strategy-evaluation" style={{ whiteSpace: 'nowrap', padding: '0 2px' }}>{t('nav.strategyEvaluation')}</Link>,
+            }
           ]}
         />
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
@@ -150,10 +162,10 @@ const AppLayout = () => {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/documents" element={<DocumentList />} />
-            <Route path="/search" element={<DocumentSearch />} />
             <Route path="/upload" element={<UploadDocument />} />
             <Route path="/assistant" element={<QueryAssistant />} />
             <Route path="/login-check" element={<LoginCheck />} />
+            <Route path="/strategy-evaluation" element={<StrategyEvaluation />} />
           </Routes>
         </div>
       </Content>

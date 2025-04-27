@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from dotenv import load_dotenv
 from app.api.gemini_routes import router, health_router
 from app.db.database import engine, Base
@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
                 if gemini_service.model_id:
                     test_model = genai.GenerativeModel(gemini_service.model_id)
                 else:
-                    test_model = genai.GenerativeModel("gemini-1.5-pro")
+                    test_model = genai.GenerativeModel("gemini-1.5-flash")
                     
                 # 发送一个简单的请求
                 response = test_model.generate_content("测试API配额")
@@ -104,7 +104,7 @@ async def lifespan(app: FastAPI):
             logger.error(f"检查API配额状态时出错: {quota_check_err}")
         
         # 打印高级功能支持
-        logger.info(f"Advanced features: Thinking Budget, Model Complexity Selection, Response Caching")
+        logger.info(f"高级功能: 最新Gemini 1.5 Flash模型, 最新Embedding模型, 向量检索缓存, 响应缓存")
     except Exception as e:
         logger.error(f"Error printing Gemini model information: {e}")
     
@@ -118,7 +118,7 @@ app = FastAPI(
     description="""
     # Gemini Vector Search API
 
-    API system based on Google Gemini 2.0 Flash model, providing the following features:
+    API system based on Google Gemini 1.5 Flash model, providing the following features:
     
     ## Main Features
     
@@ -135,6 +135,19 @@ app = FastAPI(
 
 # Set up middleware
 setup_middleware(app)
+
+# Mount static files directory for API guide and benchmarks
+# 挂载静态文件目录
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 获取项目根目录
+static_dir = os.path.join(base_dir, "static")
+api_guide_dir = os.path.join(base_dir, "static/api-guide")
+logger.info(f"项目根目录: {base_dir}")
+logger.info(f"静态文件目录路径: {static_dir}")
+logger.info(f"API指南目录路径: {api_guide_dir}")
+
+app.mount("/api-guide", StaticFiles(directory=api_guide_dir), name="api-guide")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+app.mount("/report", StaticFiles(directory=os.path.join(static_dir, "report")), name="report")
 
 # Include API routes
 app.include_router(router, tags=["API"])
@@ -184,7 +197,7 @@ async def get_open_api_endpoint():
         description="""
         # Gemini Vector Search API Documentation
         
-        This is an API system based on Google Gemini 2.0 Flash model, providing document management, vector retrieval, and AI generation capabilities.
+        This is an API system based on Google Gemini 1.5 Flash model, providing document management, vector retrieval, and AI generation capabilities.
         
         ## Access Information
         
@@ -226,7 +239,8 @@ async def root():
         "message": "Welcome to the Gemini Vector Search API",
         "swagger_docs": "/docs",
         "redoc": "/redoc",
-        "api_guide": "/api-guide"
+        "api_guide": "/api-guide",
+        "benchmark": "/api/v1/benchmark"
     }
 
 # Health check endpoint
@@ -239,6 +253,13 @@ def health_check():
         dict: Dictionary containing status information
     """
     return {"status": "healthy"}
+
+@app.get("/benchmark") 
+async def benchmark_redirect():
+    """
+    Redirect to the benchmark page
+    """
+    return RedirectResponse(url="/api/v1/benchmark")
 
 # pgvector status check endpoint
 @app.get("/vector-status", tags=["health"])
@@ -257,27 +278,6 @@ async def vector_status():
     except Exception as e:
         logger.error(f"Error checking pgvector status: {e}")
         return {"pgvector_installed": False, "error": str(e)}
-
-# Provide static files for API guide
-try:
-    static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static'))
-    logger.info(f"Attempting to mount static directory: {static_dir}")
-    if os.path.exists(static_dir) and os.path.isdir(static_dir):
-        app.mount("/api-guide", StaticFiles(directory=static_dir, html=True), name="api_guide")
-        logger.info(f"Successfully mounted static directory: {static_dir}")
-    else:
-        logger.error(f"Static directory does not exist or is not a directory: {static_dir}")
-        raise FileNotFoundError(f"Static directory not found: {static_dir}")
-except Exception as e:
-    logger.error(f"Unable to mount static files directory: {e}")
-    # Create a temporary route as an alternative
-    @app.get("/api-guide")
-    async def api_guide_redirect():
-        """Redirect to API documentation"""
-        return {"message": "API usage guide is currently unavailable, please check the Swagger documentation", "docs_url": "/docs"}
-
-# Add document browser page route
-# This feature has been removed
 
 # If this file is run directly
 if __name__ == "__main__":

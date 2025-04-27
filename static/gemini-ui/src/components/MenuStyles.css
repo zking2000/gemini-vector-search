@@ -1,0 +1,46 @@
+/* 确保菜单项文本不会被截断 */
+.ant-menu-item {
+  min-width: fit-content !important;
+  padding: 0 12px !important;
+}
+
+/* 防止导航链接文本被截断 */
+.ant-menu-item a,
+.ant-menu-item a:hover {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: initial !important;
+}
+
+/* 扩展菜单宽度 */
+.ant-menu-horizontal {
+  line-height: 46px;
+  display: flex;
+  justify-content: flex-start;
+  column-gap: 0;
+}
+
+/* 防止菜单项在小屏幕上重叠 */
+@media screen and (max-width: 1200px) {
+  .ant-menu-horizontal {
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+  }
+}
+
+/* 自定义菜单项间距 */
+.ant-menu-horizontal > .ant-menu-item {
+  margin: 0 !important;
+  padding: 0 10px !important;
+}
+
+/* 优化菜单项内部间距 */
+.ant-menu-item .ant-menu-title-content {
+  padding: 0 2px;
+}
+
+/* 确保图标和文本对齐 */
+.ant-menu-item .anticon {
+  margin-right: 4px;
+} 

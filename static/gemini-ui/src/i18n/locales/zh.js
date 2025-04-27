@@ -17,6 +17,8 @@ export default {
     noData: '暂无数据',
     back: '返回',
     more: '更多',
+    on: '开启',
+    off: '关闭'
   },
   
   // 认证相关
@@ -41,16 +43,16 @@ export default {
   // 导航菜单
   nav: {
     home: '首页',
-    queryAssistant: '智能问答',
-    uploadDocument: '上传文档',
     documentList: '文档列表',
-    documentSearch: '文档搜索',
+    uploadDocument: '上传文档',
+    queryAssistant: '查询助手',
+    strategyEvaluation: '策略评估'
   },
   
   // 首页
   home: {
     title: 'Smart RAG Platform',
-    subtitle: '基于Google Gemini 2.0 Flash模型的智能文档检索与问答系统',
+    subtitle: '基于Google Gemini 2.5 Pro模型的智能文档检索与问答系统',
     statsDocuments: '文档总数',
     statsChunks: '文本块总数',
     statsUpdated: '最近更新',
@@ -68,19 +70,20 @@ export default {
   // 文档列表页面
   documentList: {
     title: '文档列表',
-    searchPlaceholder: '搜索文档来源...',
-    colId: 'ID',
-    colSource: '来源',
-    colContent: '内容预览',
-    colType: '类型',
-    colTime: '时间',
-    colActions: '操作',
-    deleteConfirm: '确定要删除此文档吗？',
+    empty: '暂无文档',
+    upload: '上传文档',
+    search: '搜索文档',
+    source: '来源',
+    createdAt: '创建时间',
+    actions: '操作',
+    delete: '删除',
+    deleteConfirm: '确定要删除这个文档吗？',
     deleteSuccess: '文档删除成功',
-    deleteFailed: '删除文档失败，请稍后重试',
-    fetchFailed: '获取文档列表失败，请稍后重试',
-    unknown: '未知来源',
-    noContent: '无内容',
+    deleteError: '文档删除失败',
+    chunkingStrategy: {
+      fixed_size: '固定分块',
+      intelligent: '智能分块'
+    }
   },
   
   // 文档搜索页面
@@ -138,7 +141,7 @@ export default {
     allSources: '所有文档',
     useContext: '使用文档上下文',
     noContext: '仅使用模型知识',
-    maxContextDocs: '最大参考文档数',
+    maxContextDocs: '最大引用文档数',
     clearChat: '清空对话',
     inputPlaceholder: '输入问题...',
     thinking: '思考中...',
@@ -146,10 +149,20 @@ export default {
     moreContextDocs: '还有 {count} 个参考文档',
     startChat: '开始与AI助手对话',
     errorFetch: '获取回答失败，请稍后重试',
+    forceUseDocuments: '强制使用文档',
+    referenceDocument: '参考文档',
+    documentFragment: '文档片段',
+    additionalDocuments: '还有 {count} 个参考文档',
+    importDialog: {
+      title: '导入对话记录',
+      selectFile: '选择文件',
+      description: '请选择之前导出的对话记录文件（JSON格式）。',
+      warning: '注意：导入将会替换当前的对话记录。'
+    }
   },
   
   // 页脚
   footer: {
-    copyright: 'Smart RAG Platform ©{year} 由Google Gemini 2.0提供支持',
+    copyright: 'Smart RAG Platform ©{year} 由Google Gemini 2.5提供支持',
   }
 }; 
