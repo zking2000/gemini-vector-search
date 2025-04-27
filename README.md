@@ -1,4 +1,4 @@
-# Gemini Vector Search System
+# Smart RAG Platform
 
 A document retrieval and analysis system based on Google Gemini model, supporting PDF document upload, intelligent chunking, vector search, and question answering functionality based on document content.
 
