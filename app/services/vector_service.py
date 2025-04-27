@@ -194,51 +194,30 @@ class VectorService:
         try:
             embedding = await self.gemini.generate_embedding(content)
             
-            # Create document object based on updated Document model
-            # Ensure title is not empty, use default value if content is empty
-            if not content.strip():
-                title = f"Document #{metadata.get('chunk', 'Unknown')} of {metadata.get('total_chunks', 'Unknown')}" if metadata else "Empty document"
-            else:
-                # If content is too long, it may need to be truncated
-                max_title_length = 255  # Maximum length of String(255)
-                title = content[:max_title_length] if len(content) > max_title_length else content
+            # 确保向量维度正确
+            if len(embedding) != 3072:
+                raise ValueError(f"Embedding dimension mismatch. Expected 3072, got {len(embedding)}")
             
-            # Merge metadata and embedding
-            combined_metadata = metadata.copy() if metadata else {}
-            # Add embedding vector to metadata
-            combined_metadata["_embedding"] = embedding
+            # 将向量转换为数组格式
+            embedding_array = list(map(float, embedding))
             
-            # Ensure doc_metadata is a JSON string
-            doc_metadata_json = json.dumps(combined_metadata) if combined_metadata else None
-            
-            # Create document object - don't specify id, let database generate it
+            # Create document object
             doc = Document(
-                title=title,
-                doc_metadata=doc_metadata_json,
+                title=metadata.get('title', 'Untitled Document') if metadata else 'Untitled Document',
+                doc_metadata=json.dumps(metadata) if metadata else None,
+                embedding=embedding_array,
                 chunking_strategy=chunking_strategy
             )
             
-            # Save to database
-            try:
-                db.add(doc)
-                db.commit()
-                db.refresh(doc)
-                return doc
-            except Exception as db_error:
-                # If error occurs, rollback and retry
-                db.rollback()
-                print(f"Database operation failed, trying rollback and retry: {db_error}")
-                # Try again, this time explicitly specify an id
-                import random
-                doc.id = random.randint(1, 1000000)  # Generate a random ID
-                db.add(doc)
-                db.commit()
-                db.refresh(doc)
-                return doc
+            db.add(doc)
+            db.commit()
+            db.refresh(doc)
+            
+            return doc
+            
         except Exception as e:
-            print(f"Error adding document: {e}")
-            traceback.print_exc()
-            raise
+            db.rollback()
+            raise e
     
     @cached(ttl=24*3600)  # Cache for 24 hours
     @rate_limited

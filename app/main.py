@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
                 if gemini_service.model_id:
                     test_model = genai.GenerativeModel(gemini_service.model_id)
                 else:
-                    test_model = genai.GenerativeModel("gemini-1.5-pro")
+                    test_model = genai.GenerativeModel("gemini-1.5-flash")
                     
                 # 发送一个简单的请求
                 response = test_model.generate_content("测试API配额")
@@ -104,7 +104,7 @@ async def lifespan(app: FastAPI):
             logger.error(f"检查API配额状态时出错: {quota_check_err}")
         
         # 打印高级功能支持
-        logger.info(f"Advanced features: Thinking Budget, Model Complexity Selection, Response Caching")
+        logger.info(f"高级功能: 最新Gemini 1.5 Flash模型, 最新Embedding模型, 向量检索缓存, 响应缓存")
     except Exception as e:
         logger.error(f"Error printing Gemini model information: {e}")
     
@@ -118,7 +118,7 @@ app = FastAPI(
     description="""
     # Gemini Vector Search API
 
-    API system based on Google Gemini 2.0 Flash model, providing the following features:
+    API system based on Google Gemini 1.5 Flash model, providing the following features:
     
     ## Main Features
     
@@ -197,7 +197,7 @@ async def get_open_api_endpoint():
         description="""
         # Gemini Vector Search API Documentation
         
-        This is an API system based on Google Gemini 2.0 Flash model, providing document management, vector retrieval, and AI generation capabilities.
+        This is an API system based on Google Gemini 1.5 Flash model, providing document management, vector retrieval, and AI generation capabilities.
         
         ## Access Information
         

@@ -86,8 +86,8 @@ If the question is about the founder of Buddhism, pay special attention to conte
         self.genai = genai
         
         # Use latest Gemini 1.5 Pro model for better comprehension and table handling
-        self.model_id = "gemini-1.5-pro-latest"  # Updated to latest model
-        self.embedding_model_name = "models/embedding-001"  # Latest embedding model
+        self.model_id = "gemini-2.5-pro-preview-03-25"  # 更新为最新的flash模型，更快速
+        self.embedding_model_name = "models/gemini-embedding-exp-03-07"  # 最新embedding模型
         
         # Initialize with safety settings
         try:
@@ -121,20 +121,19 @@ When working with tables:
 4. For tables with financial data, ensure values are correctly associated with their categories, years, or other dimensions
 5. Understand the context of tables - including headers, footers, and annotations - to provide complete and accurate information"""
             
-            print(f"Gemini model '{self.model_id}' initialized successfully")
+            print(f"已初始化最新的Gemini模型 '{self.model_id}'")
+            print(f"已配置最新的Embedding模型 '{self.embedding_model_name}'")
         except Exception as e:
-            print(f"Error initializing Gemini model: {e}")
+            print(f"初始化Gemini模型时出错: {e}")
             self.model = None
         
         # Initialize embedding model
         try:
-            # 使用genai初始化embedding模型
-            self.embedding_model = genai.GenerativeModel(
-                model_name=self.embedding_model_name
-            )
-            print(f"Gemini embedding model '{self.embedding_model_name}' initialized successfully")
+            # 无需单独初始化embedding模型实例，直接使用genai.embed_content方法
+            print(f"配置使用Gemini embedding模型 '{self.embedding_model_name}'")
+            self.embedding_model = None  # 不再需要独立的模型实例
         except Exception as e:
-            print(f"Error initializing embedding model: {e}")
+            print(f"配置embedding模型时出错: {e}")
             self.embedding_model = None
         
         # Initialize cache
@@ -199,7 +198,7 @@ When working with tables:
         
         # 如果文本为空，返回零向量
         if not text.strip():
-            return [0.0] * 768  # 保持一致的768维度
+            return [0.0] * 3072  # 使用3072维度
             
         # 使用文本哈希作为缓存键
         cache_key = hashlib.md5(text.encode()).hexdigest()
@@ -218,9 +217,9 @@ When working with tables:
                 # 检查速率限制
                 await self._check_rate_limit("embedding")
                 
-                # 调用embedding API
+                # 使用最新的embedding API
                 result = genai.embed_content(
-                    model="models/gemini-embedding-exp-03-07",
+                    model=self.embedding_model_name,
                     content=text,
                     task_type="SEMANTIC_SIMILARITY"
                 )
@@ -228,38 +227,22 @@ When working with tables:
                 # 正确提取embedding向量
                 embedding = None
                 
-                # Google AI API返回结构可能是字典，需要正确提取
-                if isinstance(result, dict):
+                # 处理最新API返回结构
+                if hasattr(result, "embedding"):
+                    embedding = result.embedding
+                elif isinstance(result, dict):
                     if 'embedding' in result:
                         embedding = result['embedding']
-                    elif 'embeddings' in result:
+                    elif 'embeddings' in result and result['embeddings']:
                         embedding = result['embeddings'][0]
                     elif 'values' in result:
                         embedding = result['values']
-                    else:
-                        # 检查嵌套结构
-                        print(f"Embedding结果结构: {result.keys()}")
-                else:
-                    # 尝试使用属性访问
-                    try:
-                        embedding = result.embedding
-                    except AttributeError:
-                        try:
-                            embedding = result.embeddings[0]
-                        except (AttributeError, IndexError):
-                            print(f"Embedding结果类型: {type(result)}")
                 
                 if embedding:
-                    # 确保一致的维度 - 截断或填充到768维度
+                    # 确保向量维度正确
                     embedding_length = len(embedding)
-                    if embedding_length != 768:
-                        print(f"Embedding向量维度不是768 ({embedding_length})，进行调整")
-                        if embedding_length > 768:
-                            # 截断到768维度
-                            embedding = embedding[:768]
-                        else:
-                            # 填充到768维度
-                            embedding = embedding + [0.0] * (768 - embedding_length)
+                    if embedding_length != 3072:
+                        print(f"警告: Embedding向量维度不是3072 ({embedding_length})")
                     
                     # 保存到缓存
                     self.embedding_cache[cache_key] = embedding
@@ -296,7 +279,7 @@ When working with tables:
                 
         # 所有重试都失败，返回随机向量
         print("使用随机向量作为embedding")
-        random_embedding = list(np.random.rand(768))  # 始终返回768维随机向量
+        random_embedding = list(np.random.rand(3072))  # 使用3072维随机向量
         
         # 将随机向量保存到缓存，避免为相同文本生成不同的随机向量
         self.embedding_cache[cache_key] = random_embedding
@@ -388,7 +371,6 @@ When working with tables:
         
         # 根据任务复杂度选择模型
         model_name = self.model_id
-        use_thinking_budget = False
         
         # 设置重试参数
         max_retries = 3
@@ -400,11 +382,9 @@ When working with tables:
                 # 检查速率限制
                 await self._check_rate_limit("completion")
                 
-                # 创建生成模型
-                model = genai.GenerativeModel(model_name)
+                # 使用已初始化的模型
+                response = self.model.generate_content(full_prompt)
                 
-                # 调用API生成文本
-                response = model.generate_content(full_prompt)
                 if not response or not response.text:
                     raise ValueError("API返回了空响应")
                 
@@ -600,7 +580,7 @@ JSON response only:"""
             
             # Generate analysis
             print("Generating document structure analysis...")
-            model = genai.GenerativeModel("gemini-1.5-pro")
+            model = genai.GenerativeModel("gemini-2.5-pro-preview-03-25")
             response = model.generate_content(prompt)
             response_text = response.text
             

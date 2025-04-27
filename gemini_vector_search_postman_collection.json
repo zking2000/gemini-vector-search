@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "8e5f4a3d-6c7b-4d9e-8f1a-eb2c3d4e5f6g",
 		"name": "Gemini Vector Search API",
-		"description": "API for document processing, vector search, and Gemini integration.",
+		"description": "API for document processing, vector search, and integration with Google Gemini 1.5 Flash model.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -90,7 +90,7 @@
 							{
 								"key": "X-Chunking-Strategy",
 								"value": "intelligent",
-								"description": "分块策略，可选值：fixed_size, intelligent, auto",
+								"description": "分块策略，可选值：fixed_size, intelligent",
 								"type": "text",
 								"disabled": true
 							}
@@ -107,7 +107,7 @@
 							]
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/upload_pdf?preserve_tables=true&use_ocr=false&chunking_strategy=auto&chunk_size=1000&chunk_overlap=200&save_to_database=true",
+							"raw": "{{baseUrl}}/api/v1/upload_pdf?preserve_tables=true&use_ocr=false&chunking_strategy=intelligent&chunk_size=1000&chunk_overlap=200&save_to_database=true",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -129,8 +129,8 @@
 								},
 								{
 									"key": "chunking_strategy",
-									"value": "auto",
-									"description": "分块策略: 'fixed_size', 'intelligent' 或 'auto'"
+									"value": "intelligent",
+									"description": "分块策略: 必须指定 'fixed_size' 或 'intelligent'"
 								},
 								{
 									"key": "chunk_size",
@@ -161,7 +161,7 @@
 							{
 								"key": "X-Chunking-Strategy",
 								"value": "intelligent",
-								"description": "分块策略，可选值：fixed_size, intelligent, auto",
+								"description": "分块策略，可选值：fixed_size, intelligent",
 								"type": "text",
 								"disabled": true
 							}
@@ -178,7 +178,7 @@
 							]
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/upload_file?preserve_tables=true&use_ocr=false&chunking_strategy=auto&chunk_size=1000&chunk_overlap=200&save_to_database=true",
+							"raw": "{{baseUrl}}/api/v1/upload_file?preserve_tables=true&use_ocr=false&chunking_strategy=intelligent&chunk_size=1000&chunk_overlap=200&save_to_database=true",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -200,8 +200,8 @@
 								},
 								{
 									"key": "chunking_strategy",
-									"value": "auto",
-									"description": "分块策略: 'fixed_size', 'intelligent' 或 'auto'"
+									"value": "intelligent",
+									"description": "分块策略: 必须指定 'fixed_size' 或 'intelligent'"
 								},
 								{
 									"key": "chunk_size",
@@ -236,7 +236,7 @@
 									"key": "file",
 									"type": "file",
 									"src": "/path/to/your/file.pdf",
-									"description": "要上传的PDF文件"
+									"description": "要上传的PDF文件（仅支持.pdf格式）"
 								}
 							]
 						},
@@ -263,7 +263,7 @@
 								}
 							]
 						},
-						"description": "上传文档并同时使用固定尺寸分块和智能分块进行处理，方便后续比较不同策略的检索效果"
+						"description": "上传PDF文档并同时使用固定尺寸分块和智能分块进行处理，方便后续比较不同策略的检索效果。注意：此端点仅支持PDF文件格式。"
 					},
 					"response": []
 				},
@@ -482,7 +482,7 @@
 			"name": "Gemini AI",
 			"item": [
 				{
-					"name": "生成文本补全",
+					"name": "生成文本完成",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -493,7 +493,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"prompt\": \"什么是向量搜索?\",\n    \"use_context\": true,\n    \"context_query\": \"向量搜索技术\",\n    \"max_context_docs\": 3,\n    \"model_complexity\": \"normal\",\n    \"disable_cache\": false\n}"
+							"raw": "{\n  \"prompt\": \"向量数据库是什么，它有哪些主要优势？\",\n  \"use_context\": true,\n  \"context_query\": \"vector database advantages\",\n  \"max_context_docs\": 5,\n  \"disable_cache\": false,\n  \"model_complexity\": \"normal\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/completion",
@@ -506,7 +506,7 @@
 								"completion"
 							]
 						},
-						"description": "使用Gemini模型生成文本补全，可选择使用向量数据库中的相关文档作为上下文"
+						"description": "使用Gemini 1.5 Flash模型生成文本完成，可选择使用向量数据库中的相关文档作为上下文"
 					},
 					"response": []
 				},
@@ -522,10 +522,10 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"prompt\": \"向量数据库有哪些优势?\",\n    \"context_query\": \"向量数据库 优势\",\n    \"max_context_docs\": 5,\n    \"model_complexity\": \"normal\",\n    \"disable_cache\": false\n}"
+							"raw": "{\n  \"prompt\": \"请解释向量数据库的工作原理\",\n  \"use_context\": true,\n  \"context_query\": \"向量数据库工作原理\",\n  \"max_context_docs\": 5,\n  \"disable_cache\": false,\n  \"model_complexity\": \"normal\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/integration?source_filter=&debug=true&force_use_documents=false",
+							"raw": "{{baseUrl}}/api/v1/integration?source_filter=technical_paper.pdf&debug=true&force_use_documents=false",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -537,22 +537,22 @@
 							"query": [
 								{
 									"key": "source_filter",
-									"value": "",
-									"description": "按文档源过滤结果"
+									"value": "technical_paper.pdf",
+									"description": "按文档来源筛选结果"
 								},
 								{
 									"key": "debug",
 									"value": "true",
-									"description": "返回详细调试信息"
+									"description": "返回详细的调试信息"
 								},
 								{
 									"key": "force_use_documents",
 									"value": "false",
-									"description": "即使没有找到高相似度匹配，也强制使用文档内容回答"
+									"description": "强制使用文档内容回答，即使没有找到高相似度匹配项"
 								}
 							]
 						},
-						"description": "集成API，结合向量检索和文本生成，可以按文档源过滤结果并返回详细调试信息"
+						"description": "集成API，结合向量检索和Gemini 1.5 Flash文本生成，可按文档来源筛选结果并返回详细的调试信息"
 					},
 					"response": []
 				},

@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Gemini Vector Search API",
-    "description": "Vector search system based on Google Gemini model, providing document management, vector retrieval and intelligent Q&A capabilities",
+    "description": "Vector search system based on Google Gemini 1.5 Flash model, providing document management, vector retrieval and intelligent Q&A capabilities",
     "version": "1.0.0",
     "contact": {
       "name": "API Support Team"
@@ -22,7 +22,8 @@
         "properties": {
           "text": {
             "type": "string",
-            "description": "Text that needs embedding vector generation"
+            "description": "Text content for generating embedding vector",
+            "example": "Vector search refers to finding documents in a high-dimensional vector space that are closest to the query vector based on similarity"
           }
         }
       },
@@ -35,7 +36,7 @@
               "type": "number",
               "format": "float"
             },
-            "description": "Generated embedding vector"
+            "description": "Generated embedding vector, typically an array of floating-point numbers"
           },
           "dimensions": {
             "type": "integer",
@@ -49,33 +50,25 @@
         "properties": {
           "prompt": {
             "type": "string",
-            "description": "Prompt text"
+            "description": "Text prompt to be completed",
+            "example": "Please explain what a vector database is and its main advantages"
           },
           "use_context": {
             "type": "boolean",
-            "description": "Whether to use context"
+            "description": "Whether to use context documents to assist generation",
+            "default": false
           },
           "context_query": {
             "type": "string",
-            "description": "Context query"
+            "description": "Query text for retrieving context, only effective when use_context is true",
+            "example": "vector database advantages features"
           },
           "max_context_docs": {
             "type": "integer",
-            "description": "Maximum number of context documents"
-          },
-          "context": {
-            "type": "string",
-            "description": "Manually provided context"
-          },
-          "temperature": {
-            "type": "number",
-            "format": "float",
-            "description": "Temperature parameter, controls output randomness"
-          },
-          "use_chunks": {
-            "type": "boolean",
-            "description": "Whether to use document chunks for search",
-            "default": true
+            "description": "Maximum number of context documents, recommended between 1-10",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 20
           },
           "disable_cache": {
             "type": "boolean",
@@ -84,7 +77,7 @@
           },
           "model_complexity": {
             "type": "string",
-            "description": "Preferred model complexity level: 'simple', 'normal', or 'complex'. Affects which Gemini model is used and thinking budget.",
+            "description": "Preferred model complexity level: 'simple', 'normal', or 'complex'. Defaults to auto-detection.",
             "enum": ["simple", "normal", "complex"]
           }
         }
@@ -104,23 +97,17 @@
       },
       "DocumentCreate": {
         "type": "object",
-        "required": ["title", "content"],
+        "required": ["content"],
         "properties": {
-          "title": {
-            "type": "string",
-            "description": "Document title"
-          },
           "content": {
             "type": "string",
-            "description": "Document content"
-          },
-          "source": {
-            "type": "string",
-            "description": "Document source"
+            "description": "Text content of the document, which will be converted to an embedding vector",
+            "example": "Vector databases are database systems specifically designed for storing and retrieving vectors. They allow users to find semantically similar content through similarity search."
           },
           "metadata": {
             "type": "object",
-            "description": "Document metadata"
+            "description": "Document metadata, can contain arbitrary key-value pairs",
+            "example": {"source": "technical_document.pdf", "author": "John Smith", "date": "2024-05-01"}
           }
         }
       },
@@ -185,20 +172,15 @@
         "properties": {
           "query": {
             "type": "string",
-            "description": "Query text"
+            "description": "Search query text, for which an embedding vector will be generated",
+            "example": "How does vector search work?"
           },
           "limit": {
             "type": "integer",
-            "description": "Maximum number of documents to return"
-          },
-          "source_filter": {
-            "type": "string",
-            "description": "Filter documents by source"
-          },
-          "use_chunks": {
-            "type": "boolean",
-            "description": "Whether to use document chunks for search",
-            "default": true
+            "description": "Maximum number of results to return, default is 5, recommended between 1-20",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 20
           }
         }
       },
@@ -212,36 +194,32 @@
               "properties": {
                 "id": {
                   "type": "string",
-                  "description": "Chunk ID"
-                },
-                "document_id": {
-                  "type": "string",
                   "description": "Document ID"
-                },
-                "title": {
-                  "type": "string",
-                  "description": "Document title"
                 },
                 "content": {
                   "type": "string",
-                  "description": "Chunk content"
+                  "description": "Document content"
                 },
-                "source": {
-                  "type": "string",
-                  "description": "Document source"
+                "metadata": {
+                  "type": "object",
+                  "description": "Document metadata"
                 },
                 "similarity": {
                   "type": "number",
                   "format": "float",
-                  "description": "Similarity score"
-                },
-                "metadata": {
-                  "type": "object",
-                  "description": "Metadata"
+                  "description": "Similarity score between document and query"
                 }
               }
             },
-            "description": "Query results"
+            "description": "List of query results, each containing document content, metadata, and similarity score"
+          },
+          "context": {
+            "type": "string",
+            "description": "Context text prepared for LLM, merged from result contents"
+          },
+          "summary": {
+            "type": "string",
+            "description": "Summary analysis of query results"
           }
         }
       },
@@ -1178,7 +1156,7 @@
     "/upload-dual-chunking": {
       "post": {
         "summary": "上传使用双重分块策略的文档",
-        "description": "上传文档并同时使用固定尺寸分块和智能分块进行处理，方便后续比较不同策略的检索效果",
+        "description": "上传PDF文档并同时使用固定尺寸分块和智能分块进行处理，方便后续比较不同策略的检索效果。注意：此端点仅支持PDF文件格式。",
         "operationId": "uploadDualChunking",
         "tags": ["Document Management"],
         "requestBody": {
@@ -1190,7 +1168,7 @@
                   "file": {
                     "type": "string",
                     "format": "binary",
-                    "description": "PDF文件"
+                    "description": "PDF文件（仅支持.pdf格式）"
                   }
                 },
                 "required": ["file"]
