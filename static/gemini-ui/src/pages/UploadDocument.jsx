@@ -146,25 +146,82 @@ const UploadDocument = () => {
                       label={t('uploadDocument.chunkSize')}
                       name="chunkSize"
                       initialValue={1000}
+                      rules={[{ required: true, message: t('uploadDocument.chunkSizeRequired') }]}
                     >
-                      <Slider min={100} max={3000} marks={{
-                        500: '500',
-                        1000: '1000',
-                        2000: '2000',
-                        3000: '3000',
-                      }} />
+                      <Slider
+                        min={100}
+                        max={5000}
+                        step={100}
+                        marks={{
+                          100: <span style={{ display: 'inline-block', width: '40px', textAlign: 'center' }}>100</span>,
+                          1000: <span style={{ display: 'inline-block', width: '40px', textAlign: 'center' }}>1000</span>,
+                          2000: <span style={{ display: 'inline-block', width: '40px', textAlign: 'center' }}>2000</span>,
+                          3000: <span style={{ display: 'inline-block', width: '40px', textAlign: 'center' }}>3000</span>,
+                          4000: <span style={{ display: 'inline-block', width: '40px', textAlign: 'center' }}>4000</span>,
+                          5000: <span style={{ display: 'inline-block', width: '40px', textAlign: 'center' }}>5000</span>
+                        }}
+                        tooltip={{
+                          formatter: (value) => `${value} ${t('uploadDocument.chars')}`
+                        }}
+                        style={{ 
+                          margin: '0 12px',
+                          width: 'calc(100% - 24px)'
+                        }}
+                        railStyle={{
+                          backgroundColor: '#f0f0f0'
+                        }}
+                        trackStyle={{
+                          backgroundColor: '#1890ff'
+                        }}
+                        handleStyle={{
+                          borderColor: '#1890ff',
+                          backgroundColor: '#fff'
+                        }}
+                        dotStyle={{
+                          borderColor: '#1890ff'
+                        }}
+                      />
                     </Form.Item>
+
                     <Form.Item
                       label={t('uploadDocument.overlapSize')}
-                      name="overlap"
+                      name="overlapSize"
                       initialValue={200}
+                      rules={[{ required: true, message: t('uploadDocument.overlapSizeRequired') }]}
                     >
-                      <Slider min={0} max={500} marks={{
-                        0: '0',
-                        100: '100',
-                        300: '300',
-                        500: '500',
-                      }} />
+                      <Slider
+                        min={0}
+                        max={500}
+                        step={50}
+                        marks={{
+                          0: <span style={{ display: 'inline-block', width: '40px', textAlign: 'center' }}>0</span>,
+                          100: <span style={{ display: 'inline-block', width: '40px', textAlign: 'center' }}>100</span>,
+                          200: <span style={{ display: 'inline-block', width: '40px', textAlign: 'center' }}>200</span>,
+                          300: <span style={{ display: 'inline-block', width: '40px', textAlign: 'center' }}>300</span>,
+                          400: <span style={{ display: 'inline-block', width: '40px', textAlign: 'center' }}>400</span>,
+                          500: <span style={{ display: 'inline-block', width: '40px', textAlign: 'center' }}>500</span>
+                        }}
+                        tooltip={{
+                          formatter: (value) => `${value} ${t('uploadDocument.chars')}`
+                        }}
+                        style={{ 
+                          margin: '0 12px',
+                          width: 'calc(100% - 24px)'
+                        }}
+                        railStyle={{
+                          backgroundColor: '#f0f0f0'
+                        }}
+                        trackStyle={{
+                          backgroundColor: '#1890ff'
+                        }}
+                        handleStyle={{
+                          borderColor: '#1890ff',
+                          backgroundColor: '#fff'
+                        }}
+                        dotStyle={{
+                          borderColor: '#1890ff'
+                        }}
+                      />
                     </Form.Item>
                   </>
                 )}
