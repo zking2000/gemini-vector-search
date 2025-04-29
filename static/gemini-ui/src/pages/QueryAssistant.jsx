@@ -14,27 +14,10 @@ const QueryAssistant = () => {
   const [loading, setLoading] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [conversations, setConversations] = useState([]);
-  const [sources, setSources] = useState([]);
-  const [selectedSource, setSelectedSource] = useState('all');
   const [useContext, setUseContext] = useState(true);
   const [maxContextDocs, setMaxContextDocs] = useState(5);
-  const [forceUseDocuments, setForceUseDocuments] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const bottomRef = useRef(null);
-
-  // 获取文档来源列表
-  useEffect(() => {
-    const fetchSources = async () => {
-      try {
-        const response = await axios.get('/api/v1/documents/sources');
-        setSources(response.data.sources || []);
-      } catch (error) {
-        console.error('获取文档来源失败:', error);
-      }
-    };
-
-    fetchSources();
-  }, []);
 
   // 加载本地存储中的对话历史
   useEffect(() => {
@@ -48,10 +31,8 @@ const QueryAssistant = () => {
       const savedSettings = localStorage.getItem('assistantSettings');
       if (savedSettings) {
         const settings = JSON.parse(savedSettings);
-        if (settings.selectedSource) setSelectedSource(settings.selectedSource);
         if (settings.useContext !== undefined) setUseContext(settings.useContext);
         if (settings.maxContextDocs) setMaxContextDocs(settings.maxContextDocs);
-        if (settings.forceUseDocuments !== undefined) setForceUseDocuments(settings.forceUseDocuments);
       }
     } catch (error) {
       console.error('加载对话历史失败:', error);
@@ -98,16 +79,14 @@ const QueryAssistant = () => {
   useEffect(() => {
     try {
       const settings = {
-        selectedSource,
         useContext,
-        maxContextDocs,
-        forceUseDocuments
+        maxContextDocs
       };
       localStorage.setItem('assistantSettings', JSON.stringify(settings));
     } catch (error) {
       console.error('保存设置失败:', error);
     }
-  }, [selectedSource, useContext, maxContextDocs, forceUseDocuments]);
+  }, [useContext, maxContextDocs]);
 
   // 自动滚动到底部
   useEffect(() => {
@@ -142,12 +121,10 @@ const QueryAssistant = () => {
         prompt: questionText,
         use_context: useContext,
         context_query: useContext ? questionText : null,
-        max_context_docs: maxContextDocs,
-        source_filter: selectedSource !== 'all' ? selectedSource : null
+        max_context_docs: maxContextDocs
       }, {
         params: {
-          debug: true,
-          force_use_documents: forceUseDocuments
+          debug: true
         }
       });
 
@@ -206,10 +183,8 @@ const QueryAssistant = () => {
       const exportData = {
         conversations,
         settings: {
-          selectedSource,
           useContext,
-          maxContextDocs,
-          forceUseDocuments
+          maxContextDocs
         },
         exportDate: new Date().toISOString()
       };
@@ -252,10 +227,8 @@ const QueryAssistant = () => {
           
           // 导入设置
           if (importedData.settings) {
-            if (importedData.settings.selectedSource) setSelectedSource(importedData.settings.selectedSource);
             if (importedData.settings.useContext !== undefined) setUseContext(importedData.settings.useContext);
             if (importedData.settings.maxContextDocs) setMaxContextDocs(importedData.settings.maxContextDocs);
-            if (importedData.settings.forceUseDocuments !== undefined) setForceUseDocuments(importedData.settings.forceUseDocuments);
           }
           
           message.success('对话导入成功');
@@ -480,33 +453,12 @@ const QueryAssistant = () => {
             marginBottom: 16,
             flexWrap: 'wrap'
           }}>
-            <Select
-              style={{ width: 200 }}
-              value={selectedSource}
-              onChange={setSelectedSource}
-              placeholder={t('queryAssistant.sourceSelect')}
-            >
-              <Option value="all" style={{writingMode: 'horizontal-tb', textOrientation: 'mixed'}}>{t('queryAssistant.allSources')}</Option>
-              {sources.map(source => (
-                <Option key={source} value={source} style={{writingMode: 'horizontal-tb', textOrientation: 'mixed'}}>{source}</Option>
-              ))}
-            </Select>
-            
             <Text>{t('queryAssistant.useContext')}:</Text>
             <Switch 
               checked={useContext} 
               onChange={setUseContext} 
               checkedChildren={t('common.on')}
               unCheckedChildren={t('common.off')}
-            />
-            
-            <Text>{t('queryAssistant.forceUseDocuments')}:</Text>
-            <Switch 
-              checked={forceUseDocuments} 
-              onChange={setForceUseDocuments} 
-              checkedChildren={t('common.on')}
-              unCheckedChildren={t('common.off')}
-              disabled={!useContext}
             />
             
             {useContext && (
